@@ -100,7 +100,7 @@ class _HtmlPreviewScreenState extends State<HtmlPreviewScreen> {
 class MessageBubble extends StatelessWidget {
   final ChatMessage message;
   final bool isStreaming;
-  final VoidCallback? onEdit; // Tambahan untuk fitur Edit
+  final VoidCallback? onEdit;
 
   const MessageBubble({
     super.key,
@@ -123,7 +123,15 @@ class MessageBubble extends StatelessWidget {
             CircleAvatar(
               radius: 18,
               backgroundColor: Colors.deepPurpleAccent.withOpacity(0.2),
-              child: ClipOval(child: Image.asset('assets/Meta_AI_hacker_logo_cutout_20261116_221322.png', width: 36, height: 36, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.smart_toy, color: Colors.deepPurpleAccent))),
+              child: ClipOval(
+                child: Image.asset(
+                  'assets/ai.jpg.png', // <-- DIUBAH DI SINI
+                  width: 36, 
+                  height: 36, 
+                  fit: BoxFit.cover, 
+                  errorBuilder: (_, __, ___) => const Icon(Icons.smart_toy, color: Colors.deepPurpleAccent),
+                ),
+              ),
             ),
             const SizedBox(width: 10),
           ],
@@ -198,7 +206,6 @@ class _AssistantContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Cek apakah AI sedang dalam proses berpikir
     final openThink = RegExp(r'<think(?:ing)?>', caseSensitive: false);
     final closeThink = RegExp(r'</think(?:ing)?>', caseSensitive: false);
     
@@ -206,16 +213,13 @@ class _AssistantContent extends StatelessWidget {
     String mainText = content;
 
     if (openThink.hasMatch(content) && !closeThink.hasMatch(content)) {
-      isThinking = true; // Masih di dalam blok think
+      isThinking = true; 
     } else if (closeThink.hasMatch(content)) {
-      // Hapus semua tag think dan isinya
       mainText = content.replaceAll(RegExp(r'<think(?:ing)?>[\s\S]*?</think(?:ing)?>', caseSensitive: false), '').trim();
     } else {
-      // Jika tidak ada tag think sama sekali
       mainText = content;
     }
 
-    // Bersihkan prefix "Assistant:" atau "User:"
     mainText = mainText.replaceAll(RegExp(r'^(Assistant|User|AI):\s*', caseSensitive: false), '');
 
     if (isThinking) {
@@ -250,7 +254,6 @@ class _AssistantContent extends StatelessWidget {
   }
 }
 
-// Widget Animasi Loading Berpikir
 class ThinkingAnimation extends StatefulWidget {
   const ThinkingAnimation({super.key});
 
