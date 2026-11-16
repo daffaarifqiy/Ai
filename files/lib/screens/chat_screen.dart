@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:llama_flutter_android/llama_flutter_android.dart' as llama;
 import '../services/app_services.dart';
 import '../widgets/chat_widgets.dart';
+import 'settings_screen.dart';
+
+enum AIMode { fast, thinking, project }
 
 class ChatScreen extends StatefulWidget {
   final llama.LlamaController controller;
@@ -22,6 +25,9 @@ class _ChatScreenState extends State<ChatScreen> {
   
   StreamSubscription<String>? _sub;
   bool _generating = false;
+  
+  AIMode _currentMode = AIMode.fast;
+  String? _activeProject;
 
   @override
   void initState() {
@@ -34,6 +40,10 @@ class _ChatScreenState extends State<ChatScreen> {
     if (_sessions.isNotEmpty) {
       _currentSession = _sessions.first;
       _messages = ChatStorage.getMessages(_currentSession!.id);
+      if (_currentSession!.projectName != null) {
+        _activeProject = _currentSession!.projectName;
+        _currentMode = AIMode.project;
+      }
     } else {
       _createNewChat();
     }
@@ -41,8 +51,8 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
   }
 
-  void _createNewChat() async {
-    final newSess = await ChatStorage.createSession();
+  void _createNewChat({String? project}) async {
+    final newSess = await ChatStorage.createSession(projectName: project);
     setState(() {
       _sessions.insert(0, newSess);
       _currentSession = newSess;
@@ -55,6 +65,13 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() {
       _currentSession = session;
       _messages = ChatStorage.getMessages(session.id);
+      if (session.projectName != null) {
+        _activeProject = session.projectName;
+        _currentMode = AIMode.project;
+      } else {
+        _activeProject = null;
+        _currentMode = AIMode.fast;
+      }
     });
     Navigator.pop(context);
     _scrollToBottom();
@@ -73,10 +90,6 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  // ==========================================
-  // LOGIKA UTAMA: KIRIM & EDIT PESAN
-  // ==========================================
-  
   Future<void> _sendMessage() async {
     final text = _input.text.trim();
     if (text.isEmpty || _generating || _currentSession == null) return;
@@ -95,22 +108,14 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _editMessage(int index, String newText) {
     if (_generating) return;
-
-    // 1. Potong history chat dari pesan yang diedit (hapus pesan lama & balasan AI setelahnya)
     final truncatedMessages = _messages.sublist(0, index);
-    
-    // 2. Buat pesan baru yang sudah diedit
     final editedMsg = ChatMessage(role: 'user', content: newText);
     truncatedMessages.add(editedMsg);
 
     setState(() {
       _messages = truncatedMessages;
     });
-
-    // 3. Simpan state baru ke Hive (overwrite)
     ChatStorage.overwriteMessages(_currentSession!.id, _messages);
-    
-    // 4. Minta AI merespons ulang
     _generateAIResponse();
   }
 
@@ -124,12 +129,20 @@ class _ChatScreenState extends State<ChatScreen> {
     });
     _scrollToBottom();
 
-    // Ambil 10 pesan terakhir untuk konteks
     final hist = _messages.where((m) => m.id != botMsg.id).toList();
     final recent = hist.length > 10 ? hist.sublist(hist.length - 10) : hist;
 
+    // Konstruksi System Prompt berdasarkan Mode
+    String sysPrompt = 'Anda adalah xdfaaa ai, asisten coding dan AI pintar. Jawab jelas dan pakai format markdown.';
+    
+    if (_currentMode == AIMode.thinking) {
+      sysPrompt += '\nPENTING: Lakukan proses berpikir (thinking) secara mendalam terlebih dahulu. Bungkus semua proses berpikirmu di dalam tag <think>...</think>. Setelah itu, berikan jawaban akhir di luar tag.';
+    } else if (_currentMode == AIMode.project && _activeProject != null) {
+      sysPrompt += '\nAnda sedang mengerjakan sebuah PROJECT dengan nama folder: "$_activeProject". Fokuslah membantu user menyelesaikan kode atau tugas terkait project ini.';
+    }
+
     final chatHistory = <llama.ChatMessage>[
-      llama.ChatMessage(role: 'system', content: 'Anda adalah xdfaaa ai, asisten coding dan AI pintar. Jawab jelas dan pakai format markdown.'),
+      llama.ChatMessage(role: 'system', content: sysPrompt),
       ...recent.map((m) => llama.ChatMessage(role: m.role, content: m.content)),
     ];
 
@@ -161,6 +174,59 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  // --- LOGIKA UI PROJECT MODE ---
+  void _selectProjectMode() async {
+    final projects = await ProjectService.getAllProjects();
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        final newProjectCtrl = TextEditingController();
+        return AlertDialog(
+          backgroundColor: const Color(0xFF161B22),
+          title: const Text('Pilih Project', style: TextStyle(color: Colors.white)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (projects.isNotEmpty) ...[
+                DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(labelText: 'Project yang ada', border: OutlineInputBorder()),
+                  items: projects.map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
+                  onChanged: (val) {
+                    Navigator.pop(ctx);
+                    _createNewChat(project: val);
+                  },
+                ),
+                const SizedBox(height: 16),
+                const Text('ATAU buat baru:', style: TextStyle(color: Colors.white54, fontSize: 12)),
+              ],
+              const SizedBox(height: 8),
+              TextField(
+                controller: newProjectCtrl,
+                decoration: const InputDecoration(labelText: 'Nama Folder Project Baru', border: OutlineInputBorder()),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal', style: TextStyle(color: Colors.white54))),
+            FilledButton(
+              onPressed: () async {
+                final newName = newProjectCtrl.text.trim();
+                if (newName.isNotEmpty) {
+                  await ProjectService.createProject(newName);
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  _createNewChat(project: newName);
+                }
+              },
+              child: const Text('Buat & Pilih'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -168,9 +234,12 @@ class _ChatScreenState extends State<ChatScreen> {
         title: const Text('xdfaaa ai'),
         actions: [
           IconButton(
-            onPressed: _generating ? null : _createNewChat,
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+            icon: const Icon(Icons.settings),
+          ),
+          IconButton(
+            onPressed: _generating ? null : () => _createNewChat(),
             icon: const Icon(Icons.add_comment),
-            tooltip: 'Chat Baru',
           ),
         ],
       ),
@@ -184,8 +253,9 @@ class _ChatScreenState extends State<ChatScreen> {
               final isSelected = sess.id == _currentSession?.id;
               return ListTile(
                 selected: isSelected,
-                leading: const Icon(Icons.chat_bubble_outline),
+                leading: Icon(sess.projectName != null ? Icons.folder : Icons.chat_bubble_outline),
                 title: Text(sess.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                subtitle: sess.projectName != null ? Text(sess.projectName!, style: const TextStyle(fontSize: 10)) : null,
                 trailing: IconButton(
                   icon: const Icon(Icons.delete, size: 18),
                   onPressed: () => _deleteSession(sess),
@@ -210,7 +280,6 @@ class _ChatScreenState extends State<ChatScreen> {
                       return MessageBubble(
                         message: _messages[i],
                         isStreaming: _generating && last && _messages[i].role == 'assistant',
-                        // Tambahkan callback edit khusus untuk pesan user
                         onEdit: _messages[i].role == 'user' && !_generating
                             ? () => _showEditDialog(i, _messages[i].content)
                             : null,
@@ -219,6 +288,30 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
           ),
           if (_generating) const LinearProgressIndicator(minHeight: 2),
+          
+          // --- MODE SELECTOR UI ---
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            child: Row(
+              children: [
+                _buildModeChip('Fast', AIMode.fast),
+                const SizedBox(width: 8),
+                _buildModeChip('Thinking', AIMode.thinking),
+                const SizedBox(width: 8),
+                _buildModeChip('Project', AIMode.project),
+                if (_currentMode == AIMode.project && _activeProject != null) ...[
+                  const SizedBox(width: 8),
+                  Chip(
+                    avatar: const Icon(Icons.folder, size: 14, color: Colors.greenAccent),
+                    label: Text(_activeProject!, style: const TextStyle(fontSize: 12, color: Colors.greenAccent)),
+                    backgroundColor: Colors.greenAccent.withOpacity(0.1),
+                  ),
+                ]
+              ],
+            ),
+          ),
+
           SafeArea(
             top: false,
             child: Padding(
@@ -253,7 +346,28 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  // Dialog untuk mengedit pesan
+  Widget _buildModeChip(String label, AIMode mode) {
+    final isSelected = _currentMode == mode;
+    return ChoiceChip(
+      label: Text(label, style: TextStyle(color: isSelected ? Colors.white : Colors.white54, fontSize: 12)),
+      selected: isSelected,
+      selectedColor: const Color(0xFF7C4DFF),
+      backgroundColor: const Color(0xFF161B22),
+      onSelected: (val) {
+        if (val) {
+          if (mode == AIMode.project) {
+            _selectProjectMode();
+          } else {
+            setState(() {
+              _currentMode = mode;
+              _activeProject = null;
+            });
+          }
+        }
+      },
+    );
+  }
+
   void _showEditDialog(int index, String currentText) {
     final editCtrl = TextEditingController(text: currentText);
     showDialog(
@@ -265,17 +379,10 @@ class _ChatScreenState extends State<ChatScreen> {
           controller: editCtrl,
           maxLines: null,
           style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
-            filled: true,
-            fillColor: Color(0xFF0D1117),
-            border: OutlineInputBorder(),
-          ),
+          decoration: const InputDecoration(filled: true, fillColor: Color(0xFF0D1117), border: OutlineInputBorder()),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Batal', style: TextStyle(color: Colors.white54)),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal', style: TextStyle(color: Colors.white54))),
           FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
