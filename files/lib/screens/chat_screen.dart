@@ -57,6 +57,13 @@ class _ChatScreenState extends State<ChatScreen> {
       _sessions.insert(0, newSess);
       _currentSession = newSess;
       _messages = [];
+      if (project != null) {
+        _activeProject = project;
+        _currentMode = AIMode.project;
+      } else {
+        _activeProject = null;
+        _currentMode = AIMode.fast;
+      }
     });
     _scrollToBottom();
   }
@@ -132,7 +139,6 @@ class _ChatScreenState extends State<ChatScreen> {
     final hist = _messages.where((m) => m.id != botMsg.id).toList();
     final recent = hist.length > 10 ? hist.sublist(hist.length - 10) : hist;
 
-    // Konstruksi System Prompt berdasarkan Mode
     String sysPrompt = 'Anda adalah xdfaaa ai, asisten coding dan AI pintar. Jawab jelas dan pakai format markdown.';
     
     if (_currentMode == AIMode.thinking) {
@@ -174,7 +180,6 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  // --- LOGIKA UI PROJECT MODE ---
   void _selectProjectMode() async {
     final projects = await ProjectService.getAllProjects();
     if (!mounted) return;
@@ -289,7 +294,6 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           if (_generating) const LinearProgressIndicator(minHeight: 2),
           
-          // --- MODE SELECTOR UI ---
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
