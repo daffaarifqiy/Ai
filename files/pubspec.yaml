@@ -30,13 +30,13 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/Meta_AI_hacker_logo_cutout_20261116_221322.png
-    - assets/Meta_AI_xdfaaa_team_logo_v2_masked_20261116_221302.png
+    - assets/ai.jpg.png
+    - assets/ai.png.png
 
 flutter_launcher_icons:
   android: true
   ios: false
-  image_path: "assets/Meta_AI_xdfaaa_team_logo_v2_masked_20261116_221302.png"
+  image_path: "assets/ai.png.png"
   min_sdk_android: 26
   adaptive_icon_background: "#0D1117"
-  adaptive_icon_foreground: "assets/Meta_AI_xdfaaa_team_logo_v2_masked_20261116_221302.png"
+  adaptive_icon_foreground: "assets/ai.png.png"
