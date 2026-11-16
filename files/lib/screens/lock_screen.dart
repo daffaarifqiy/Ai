@@ -12,19 +12,38 @@ class LockScreen extends StatefulWidget {
 class _LockScreenState extends State<LockScreen> {
   final _pinCtrl = TextEditingController();
   bool _isError = false;
+  bool _isLoading = false;
 
   void _checkPin() async {
-    final correctPin = await SettingsService.getPassword();
-    if (_pinCtrl.text == correctPin) {
-      if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const WelcomeScreen()),
-        );
+    setState(() {
+      _isLoading = true;
+      _isError = false;
+    });
+
+    try {
+      final correctPin = await SettingsService.getPassword();
+      if (_pinCtrl.text == correctPin) {
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+          );
+        }
+      } else {
+        setState(() => _isError = true);
+        _pinCtrl.clear();
       }
-    } else {
+    } catch (e) {
+      // Jika gagal baca storage
       setState(() => _isError = true);
-      _pinCtrl.clear();
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  @override
+  void dispose() {
+    _pinCtrl.dispose();
+    super.dispose();
   }
 
   @override
@@ -54,14 +73,16 @@ class _LockScreenState extends State<LockScreen> {
                     errorText: _isError ? 'PIN Salah' : null,
                     border: const OutlineInputBorder(),
                   ),
-                  onSubmitted: (_) => _checkPin(),
+                  onSubmitted: (_) => _isLoading ? null : _checkPin(),
                 ),
               ),
               const SizedBox(height: 24),
-              FilledButton(
-                onPressed: _checkPin,
-                child: const Text('Buka Aplikasi'),
-              ),
+              _isLoading
+                  ? const CircularProgressIndicator()
+                  : FilledButton(
+                      onPressed: _checkPin,
+                      child: const Text('Buka Aplikasi'),
+                    ),
             ],
           ),
         ),
