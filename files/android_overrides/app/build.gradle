@@ -6,7 +6,8 @@ plugins {
 
 android {
     namespace = "com.xdfaaa.ai"
-    compileSdk = flutter.compileSdkVersion
+    // UBAH KE 35 (Karena plugin llama_flutter_android membutuhkannya)
+    compileSdk = 35 
     ndkVersion = "27.0.12077973"
 
     compileOptions {
@@ -18,7 +19,7 @@ android {
     defaultConfig {
         applicationId = "com.xdfaaa.ai"
         minSdk = 26
-        targetSdk = flutter.targetSdkVersion
+        targetSdk = 35 // UBAH KE 35
         versionCode = 1
         versionName = "1.0.0"
     }
