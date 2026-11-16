@@ -21,24 +21,34 @@ jobs:
           flutter-version: '3.29.3' 
           channel: stable
 
-      - name: Prepare Project
+      - name: Prepare Project (Robust Copy)
         run: |
           # 1. Buat project Flutter bersih di folder /tmp/app
           flutter create --platforms=android --org com.xdfaaa --project-name xdfaaa_ai /tmp/app
           
-          # 2. Salin file dari repo user ke folder /tmp/app
+          # 2. Salin pubspec.yaml (Cek di root, lalu cek di folder files)
           if [ -f "pubspec.yaml" ]; then
-            echo "Menyalin file dari ROOT repo..."
-            cp -r pubspec.yaml lib assets /tmp/app/ 2>/dev/null || true
-          elif [ -d "files" ]; then
-            echo "Menyalin file dari folder 'files'..."
-            cp -r files/pubspec.yaml files/lib files/assets /tmp/app/ 2>/dev/null || true
-          else
-            echo "❌ ERROR: Tidak dapat menemukan pubspec.yaml di root atau di folder 'files'!"
-            exit 1
+            cp pubspec.yaml /tmp/app/
+          elif [ -f "files/pubspec.yaml" ]; then
+            cp files/pubspec.yaml /tmp/app/
           fi
 
-          # 3. Tulis ulang konfigurasi Android (SDK 35, Kotlin 2.1.0)
+          # 3. Salin folder lib (Cek di root, lalu cek di folder files)
+          if [ -d "lib" ]; then
+            cp -r lib /tmp/app/
+          elif [ -d "files/lib" ]; then
+            cp -r files/lib /tmp/app/
+          fi
+
+          # 4. Salin folder assets (Cek di root, lalu cek di folder files)
+          mkdir -p /tmp/app/assets
+          if [ -d "assets" ]; then
+            cp -r assets/* /tmp/app/assets/ 2>/dev/null || true
+          elif [ -d "files/assets" ]; then
+            cp -r files/assets/* /tmp/app/assets/ 2>/dev/null || true
+          fi
+
+          # 5. Tulis ulang konfigurasi Android (SDK 35, Kotlin 2.1.0)
           cat << 'EOF' > /tmp/app/android/settings.gradle
           pluginManagement {
               def flutterSdkPath = {
@@ -101,8 +111,8 @@ jobs:
                   applicationId = "com.xdfaaa.ai"
                   minSdk = 26
                   targetSdk = 35
-                  versionCode = 3
-                  versionName = "1.2.0"
+                  versionCode = 4
+                  versionName = "1.2.1"
               }
               buildTypes {
                   release {
