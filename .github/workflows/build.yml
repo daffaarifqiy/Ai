@@ -9,7 +9,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     
-    # INI KUNCI UTAMANYA: Semua perintah dijalankan di dalam folder 'files'
     defaults:
       run:
         working-directory: files
@@ -33,6 +32,10 @@ jobs:
           cp -r /tmp/scaffold/android ./android
           cp -r android_overrides/. android/
 
+      # ⬇️ TAMBAHAN BARU: Menyalin PNG dari folder assets/ ke folder files/
+      - name: Copy PNG Assets
+        run: cp ../assets/*.png ./
+
       - name: Get dependencies
         run: flutter pub get
 
@@ -46,5 +49,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: xdfaaa-ai-apk
-          # Path APK juga disesuaikan karena sekarang berada di dalam folder 'files'
           path: files/build/app/outputs/flutter-apk/app-release.apk
