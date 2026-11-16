@@ -76,8 +76,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
             children: [
               ClipOval(
                 child: Image.asset(
-                  'assets/Meta_AI_hacker_logo_cutout_20261116_221322.png',
-                  width: 100, height: 100, fit: BoxFit.cover,
+                  'assets/ai.jpg.png', // <-- DIUBAH DI SINI
+                  width: 100, 
+                  height: 100, 
+                  fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => const Icon(Icons.psychology, size: 100, color: Colors.deepPurpleAccent),
                 ),
               ),
