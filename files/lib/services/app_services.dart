@@ -38,35 +38,60 @@ class ChatMessage {
 class ChatSession {
   final String id;
   final String title;
+  final String? projectName; // Tambahan untuk Project Mode
   final DateTime createdAt;
 
   ChatSession({
     required this.id,
     required this.title,
+    this.projectName,
     required this.createdAt,
   });
 
   Map<String, dynamic> toMap() => {
         'id': id,
         'title': title,
+        'projectName': projectName,
         'createdAt': createdAt.toIso8601String(),
       };
 
   factory ChatSession.fromMap(Map<String, dynamic> m) => ChatSession(
         id: m['id'] as String,
         title: m['title'] as String,
+        projectName: m['projectName'] as String?,
         createdAt: DateTime.parse(m['createdAt'] as String),
       );
+}
+
+class ProjectService {
+  static Future<Directory> getProjectsDir() async {
+    final base = await getExternalStorageDirectory() ?? await getApplicationDocumentsDirectory();
+    final dir = Directory('${base.path}/xdfaaa_projects');
+    if (!await dir.exists()) await dir.create(recursive: true);
+    return dir;
+  }
+
+  static Future<List<String>> getAllProjects() async {
+    final dir = await getProjectsDir();
+    return dir.list().where((e) => e is Directory).map((e) => e.path.split('/').last).toList();
+  }
+
+  static Future<void> createProject(String name) async {
+    final dir = await getProjectsDir();
+    final newFolder = Directory('${dir.path}/$name');
+    if (!await newFolder.exists()) await newFolder.create();
+  }
 }
 
 class ChatStorage {
   static const String _boxSessions = 'chat_sessions';
   static const String _boxMessages = 'chat_messages';
 
-  static Future<ChatSession> createSession() async {
+  static Future<ChatSession> createSession({String? projectName}) async {
     final session = ChatSession(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
-      title: 'Obrolan Baru',
+      title: projectName != null ? 'Project: $projectName' : 'Obrolan Baru',
+      projectName: projectName,
       createdAt: DateTime.now(),
     );
     await Hive.box(_boxSessions).put(session.id, session.toMap());
@@ -95,10 +120,16 @@ class ChatStorage {
         final sess = ChatSession.fromMap(Map<String, dynamic>.from(sessData));
         if (sess.title == 'Obrolan Baru') {
           final newTitle = msg.content.length > 25 ? '${msg.content.substring(0, 25)}...' : msg.content;
-          await sessBox.put(sessionId, ChatSession(id: sess.id, title: newTitle, createdAt: sess.createdAt).toMap());
+          await sessBox.put(sessionId, ChatSession(id: sess.id, title: newTitle, projectName: sess.projectName, createdAt: sess.createdAt).toMap());
         }
       }
     }
+  }
+
+  static Future<void> overwriteMessages(String sessionId, List<ChatMessage> msgs) async {
+    final box = Hive.box(_boxMessages);
+    final listMap = msgs.map((e) => e.toMap()).toList();
+    await box.put(sessionId, listMap);
   }
 
   static List<ChatMessage> getMessages(String sessionId) {
@@ -130,7 +161,6 @@ class PermissionService {
 }
 
 class ModelService {
-  // Model 1.5B Coder
   static const String modelUrl = 'https://huggingface.co/huihui-ai/Qwen2.5-Coder-1.5B-Instruct-abliterated-GGUF/resolve/main/Qwen2.5-Coder-1.5B-Instruct-abliterated.Q4_K_M.gguf';
   static const String modelFileName = 'qwen2.5-coder-1.5b-abliterated.gguf';
   static const int minValidSize = 100000000;
