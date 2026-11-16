@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'screens/welcome_screen.dart';
+import 'screens/lock_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,12 +28,9 @@ class XdfaaaApp extends StatelessWidget {
         brightness: Brightness.dark,
         colorSchemeSeed: const Color(0xFF7C4DFF),
         scaffoldBackgroundColor: const Color(0xFF0D1117),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF161B22),
-          elevation: 0,
-        ),
+        appBarTheme: const AppBarTheme(backgroundColor: Color(0xFF161B22), elevation: 0),
       ),
-      home: const WelcomeScreen(),
+      home: const LockScreen(), // Mulai dari Lock Screen
     );
   }
 }
