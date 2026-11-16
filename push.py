@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Membaca config.json dan mengunggah semua file di files/ + assets/ ke GitHub."""
+"""Membaca config.json dan mengunggah files/, .github/workflows/build.yml, dan assets/ ke GitHub."""
 import base64, json, sys, urllib.error, urllib.request
 from pathlib import Path
 
@@ -7,12 +7,13 @@ DEPLOY = Path(__file__).parent.resolve()
 CONFIG = DEPLOY / "config.json"
 FILES = DEPLOY / "files"
 ASSETS = DEPLOY / "assets"
+BUILD_YML = DEPLOY / ".github" / "workflows" / "build.yml"   # ← path TETAP
 API = "https://api.github.com"
 
 
 def load_config():
     if not CONFIG.exists():
-        sys.exit(f"❌ Buat config.json dulu (copy dari config.example.json)")
+        sys.exit("❌ Buat config.json dulu (copy dari config.example.json)")
     cfg = json.loads(CONFIG.read_text(encoding="utf-8"))
     token = cfg.get("github_token", "").strip()
     url = cfg.get("repo_url", "").strip()
@@ -74,9 +75,13 @@ def main():
     token, repo_url, branch = load_config()
     owner, repo = parse_repo(repo_url)
     print(f"📦 Repo: {owner}/{repo} (branch {branch})")
+
     if not FILES.exists():
         sys.exit(f"❌ Folder {FILES} tidak ada.")
+
     ok = fail = 0
+
+    # 1. Semua file di deploy/files/ → langsung ke path yang sama di repo
     for src in sorted(FILES.rglob("*")):
         if src.is_file():
             rel = src.relative_to(FILES).as_posix()
@@ -84,6 +89,18 @@ def main():
                 ok += 1
             else:
                 fail += 1
+
+    # 2. deploy/.github/workflows/build.yml → .github/workflows/build.yml (path sama)
+    if BUILD_YML.exists():
+        if upload(token, owner, repo, branch, ".github/workflows/build.yml",
+                  BUILD_YML.read_bytes(), message="Update CI workflow"):
+            ok += 1
+        else:
+            fail += 1
+    else:
+        print("⚠️ deploy/.github/workflows/build.yml tidak ditemukan.")
+
+    # 3. Semua PNG di deploy/assets/ → root repo
     if ASSETS.exists():
         for png in sorted(ASSETS.glob("*.png")):
             if upload(token, owner, repo, branch, png.name, png.read_bytes(),
@@ -91,6 +108,7 @@ def main():
                 ok += 1
             else:
                 fail += 1
+
     print(f"\n✅ {ok} sukses, {fail} gagal")
     print("Buka GitHub → Actions → Build xdfaaa ai APK → Run workflow.")
 
