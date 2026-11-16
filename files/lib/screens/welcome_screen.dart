@@ -20,53 +20,55 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   }
 
   Future<void> _initApp() async {
-    // Memberikan efek loading sebentar agar ucapan selamat datang terlihat
-    await Future.delayed(const Duration(seconds: 2));
-    
-    bool hasPerm = await PermissionService.hasStorage();
-    if (!hasPerm) {
-      setState(() => _status = 'Menunggu izin penyimpanan...');
-      hasPerm = await PermissionService.requestStorage();
+    try {
+      // Memberikan efek loading sebentar
+      await Future.delayed(const Duration(seconds: 2));
+      
+      bool hasPerm = await PermissionService.hasStorage();
       if (!hasPerm) {
-        setState(() => _status = 'Izin ditolak. Aplikasi tidak bisa berjalan.');
-        return;
+        setState(() => _status = 'Menunggu izin penyimpanan...');
+        hasPerm = await PermissionService.requestStorage();
+        if (!hasPerm) {
+          setState(() => _status = 'Izin ditolak.\nBuka pengaturan dan izinkan akses penyimpanan.');
+          return;
+        }
       }
-    }
 
-    setState(() => _status = 'Memuat AI...');
-    bool modelReady = await ModelService.isModelDownloaded();
+      setState(() => _status = 'Memuat AI...');
+      bool modelReady = await ModelService.isModelDownloaded();
 
-    if (!modelReady) {
-      setState(() => _status = 'Mengunduh model (1.1 GB)...');
-      try {
+      if (!modelReady) {
+        setState(() => _status = 'Mengunduh model (1.1 GB)...');
         await ModelService.downloadModel(onProgress: (recv, total) {
-          if (mounted) {
+          if (mounted && total > 0) {
             setState(() {
               _status = 'Mengunduh: ${(recv / 1024 / 1024).toStringAsFixed(0)} MB / ${(total / 1024 / 1024).toStringAsFixed(0)} MB';
             });
           }
         });
-      } catch (e) {
-        setState(() => _status = 'Gagal unduh model: $e');
-        return;
       }
-    }
 
-    setState(() => _status = 'Menyiapkan mesin AI...');
-    try {
+      setState(() => _status = 'Menyiapkan mesin AI...');
+      
+      // Jika library C++ crash, try-catch ini akan mencegah aplikasi tertutup
       final controller = await ModelService.loadModel();
+      
       if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => ChatScreen(controller: controller)),
         );
       }
     } catch (e) {
-      setState(() => _status = 'Gagal memuat model: $e');
+      if (mounted) {
+        setState(() => _status = 'Gagal memuat AI:\n$e\n\nPastikan HP memiliki RAM yang cukup dan coba buka ulang aplikasi.');
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isError = _status.contains('Gagal') || _status.contains('ditolak');
+
     return Scaffold(
       body: Center(
         child: Padding(
@@ -76,32 +78,23 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
             children: [
               ClipOval(
                 child: Image.asset(
-                  'assets/ai.jpg.png', // <-- DIUBAH DI SINI
-                  width: 100, 
-                  height: 100, 
-                  fit: BoxFit.cover,
+                  'assets/ai.jpg.png', 
+                  width: 100, height: 100, fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => const Icon(Icons.psychology, size: 100, color: Colors.deepPurpleAccent),
                 ),
               ),
               const SizedBox(height: 24),
-              const Text(
-                'Selamat datang,',
-                style: TextStyle(fontSize: 18, color: Colors.white70),
-              ),
+              const Text('Selamat datang,', style: TextStyle(fontSize: 18, color: Colors.white70)),
               const SizedBox(height: 8),
-              const Text(
-                'Athailla Daffa Arifqiy',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
-              ),
+              const Text('Athailla Daffa Arifqiy', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
               const SizedBox(height: 48),
-              const CircularProgressIndicator(),
+              
+              isError 
+                  ? const Icon(Icons.error_outline, color: Colors.redAccent, size: 48)
+                  : const CircularProgressIndicator(),
+                  
               const SizedBox(height: 24),
-              Text(
-                _status,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white54, fontSize: 14),
-              ),
+              Text(_status, textAlign: TextAlign.center, style: TextStyle(color: isError ? Colors.redAccent : Colors.white54, fontSize: 14)),
             ],
           ),
         ),
