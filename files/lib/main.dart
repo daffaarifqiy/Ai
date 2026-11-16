@@ -6,16 +6,19 @@ import 'screens/lock_screen.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Mengatur warna status bar agar menyatu dengan tema gelap
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,
   ));
 
-  // Inisialisasi database lokal (Hive)
-  await Hive.initFlutter();
-  await Hive.openBox('chat_sessions');
-  await Hive.openBox('chat_messages');
+  // Cegah crash jika Hive gagal inisialisasi
+  try {
+    await Hive.initFlutter();
+    await Hive.openBox('chat_sessions');
+    await Hive.openBox('chat_messages');
+  } catch (e) {
+    debugPrint('Peringatan: Gagal inisialisasi database lokal - $e');
+  }
 
   runApp(const XdfaaaApp());
 }
@@ -47,7 +50,6 @@ class XdfaaaApp extends StatelessWidget {
           ),
         ),
       ),
-      // Aplikasi dimulai dari layar kunci (Lock Screen)
       home: const LockScreen(), 
     );
   }
