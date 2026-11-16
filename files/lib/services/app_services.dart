@@ -1,5 +1,5 @@
 import 'dart:io';
-
+import 'dart:convert';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:hive/hive.dart';
 import 'package:http/http.dart' as http;
@@ -36,6 +36,97 @@ class ChatMessage {
       );
 }
 
+class ChatSession {
+  final String id;
+  final String title;
+  final DateTime createdAt;
+
+  ChatSession({
+    required this.id,
+    required this.title,
+    required this.createdAt,
+  });
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'title': title,
+        'createdAt': createdAt.toIso8601String(),
+      };
+
+  factory ChatSession.fromMap(Map<String, dynamic> m) => ChatSession(
+        id: m['id'] as String,
+        title: m['title'] as String,
+        createdAt: DateTime.parse(m['createdAt'] as String),
+      );
+}
+
+class ChatStorage {
+  static const String _boxSessions = 'chat_sessions';
+  static const String _boxMessages = 'chat_messages';
+
+  // Sesi Baru
+  static Future<ChatSession> createSession() async {
+    final session = ChatSession(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      title: 'Obrolan Baru',
+      createdAt: DateTime.now(),
+    );
+    await Hive.box(_boxSessions).put(session.id, session.toMap());
+    return session;
+  }
+
+  // Ambil Semua Sesi
+  static List<ChatSession> getSessions() {
+    final list = Hive.box(_boxSessions)
+        .values
+        .map((e) => ChatSession.fromMap(Map<String, dynamic>.from(e)))
+        .toList();
+    list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return list;
+  }
+
+  // Simpan Pesan
+  static Future<void> saveMessage(String sessionId, ChatMessage msg) async {
+    final box = Hive.box(_boxMessages);
+    List<dynamic> msgs = box.get(sessionId, defaultValue: []);
+    msgs.add(msg.toMap());
+    await box.put(sessionId, msgs);
+
+    // Update judul sesi jika masih "Obrolan Baru" dan pesan pertama dari user
+    if (msg.role == 'user') {
+      final sessBox = Hive.box(_boxSessions);
+      final sessData = sessBox.get(sessionId);
+      if (sessData != null) {
+        final sess = ChatSession.fromMap(Map<String, dynamic>.from(sessData));
+        if (sess.title == 'Obrolan Baru') {
+          final newTitle = msg.content.length > 25
+              ? '${msg.content.substring(0, 25)}...'
+              : msg.content;
+          await sessBox.put(sessionId, ChatSession(
+            id: sess.id,
+            title: newTitle,
+            createdAt: sess.createdAt,
+          ).toMap());
+        }
+      }
+    }
+  }
+
+  // Ambil Pesan Berdasarkan Sesi
+  static List<ChatMessage> getMessages(String sessionId) {
+    final box = Hive.box(_boxMessages);
+    final List<dynamic> msgs = box.get(sessionId, defaultValue: []);
+    return msgs
+        .map((e) => ChatMessage.fromMap(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  static Future<void> deleteSession(String sessionId) async {
+    await Hive.box(_boxSessions).delete(sessionId);
+    await Hive.box(_boxMessages).delete(sessionId);
+  }
+}
+
 class PermissionService {
   static Future<bool> requestStorage() async {
     if (!Platform.isAndroid) return true;
@@ -54,15 +145,14 @@ class PermissionService {
     }
     return Permission.storage.isGranted;
   }
-
-  static Future<void> openSettings() => openAppSettings();
 }
 
 class ModelService {
+  // URL Model Baru: Qwen2.5-Coder-1.5B-abliterated (Q4_K_M)
   static const String modelUrl =
-      'https://huggingface.co/prithivMLmods/Qwen3-4B-abliterated-f32-GGUFs/resolve/main/Qwen3-4B-abliterated.Q4_K_M.gguf';
-  static const String modelFileName = 'qwen3-4b-abliterated-q4_k_m.gguf';
-  static const int minValidSize = 1000000000;
+      'https://huggingface.co/huihui-ai/Qwen2.5-Coder-1.5B-Instruct-abliterated-GGUF/resolve/main/Qwen2.5-Coder-1.5B-Instruct-abliterated.Q4_K_M.gguf';
+  static const String modelFileName = 'qwen2.5-coder-1.5b-abliterated.gguf';
+  static const int minValidSize = 100000000; // ~100 MB validasi minimal
 
   static Future<Directory> getModelDir() async {
     final base = await getExternalStorageDirectory() ??
@@ -111,6 +201,7 @@ class ModelService {
       final gpu = await c.detectGpu();
       gpuLayers = gpu.recommendedGpuLayers;
     } catch (_) {}
+    
     await c.loadModel(
       modelPath: path,
       threads: 4,
@@ -119,22 +210,4 @@ class ModelService {
     );
     return c;
   }
-}
-
-class ChatStorage {
-  static const String _box = 'messages';
-
-  static Future<void> save(ChatMessage m) async =>
-      Hive.box(_box).put(m.id, m.toMap());
-
-  static List<ChatMessage> loadAll() {
-    final list = Hive.box(_box)
-        .values
-        .map((e) => ChatMessage.fromMap(Map<String, dynamic>.from(e)))
-        .toList()
-      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
-    return list;
-  }
-
-  static Future<void> clear() async => Hive.box(_box).clear();
 }
