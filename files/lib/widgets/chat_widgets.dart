@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_highlight/flutter_highlight.dart';
 import 'package:flutter_highlight/themes/atom-one-dark.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import '../services/app_services.dart';
 
 class CodeBlock extends StatelessWidget {
   final String code;
@@ -69,7 +70,6 @@ class CodeBlock extends StatelessWidget {
   }
 }
 
-// Layar WebView untuk menjalankan HTML
 class HtmlPreviewScreen extends StatefulWidget {
   final String htmlContent;
   const HtmlPreviewScreen({super.key, required this.htmlContent});
@@ -100,51 +100,93 @@ class _HtmlPreviewScreenState extends State<HtmlPreviewScreen> {
 class MessageBubble extends StatelessWidget {
   final ChatMessage message;
   final bool isStreaming;
-  const MessageBubble({super.key, required this.message, this.isStreaming = false});
+  final VoidCallback? onEdit; // Tambahan untuk fitur Edit
+
+  const MessageBubble({
+    super.key,
+    required this.message,
+    this.isStreaming = false,
+    this.onEdit,
+  });
 
   @override
   Widget build(BuildContext context) {
     final isUser = message.role == 'user';
+    
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
       child: Row(
         mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!isUser) ...[
             CircleAvatar(
-              radius: 16,
-              backgroundColor: Colors.transparent,
-              child: ClipOval(child: Image.asset('assets/Meta_AI_hacker_logo_cutout_20261116_221322.png', width: 32, height: 32, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.smart_toy))),
+              radius: 18,
+              backgroundColor: Colors.deepPurpleAccent.withOpacity(0.2),
+              child: ClipOval(child: Image.asset('assets/Meta_AI_hacker_logo_cutout_20261116_221322.png', width: 36, height: 36, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.smart_toy, color: Colors.deepPurpleAccent))),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
           ],
           Flexible(
             child: GestureDetector(
-              onLongPress: () {
-                Clipboard.setData(ClipboardData(text: message.content));
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pesan disalin')));
-              },
+              onLongPress: () => _showActionMenu(context, isUser),
               child: Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: isUser ? const Color(0xFF7C4DFF).withOpacity(0.25) : const Color(0xFF21262D),
+                  color: isUser ? const Color(0xFF2D1B54) : const Color(0xFF161B22),
                   borderRadius: BorderRadius.only(
                     topLeft: const Radius.circular(16),
                     topRight: const Radius.circular(16),
-                    bottomLeft: Radius.circular(isUser ? 16 : 4),
-                    bottomRight: Radius.circular(isUser ? 4 : 16),
+                    bottomLeft: Radius.circular(isUser ? 16 : 0),
+                    bottomRight: Radius.circular(isUser ? 0 : 16),
                   ),
-                  border: Border.all(color: isUser ? const Color(0xFF7C4DFF).withOpacity(0.5) : Colors.white12),
+                  border: Border.all(
+                    color: isUser ? const Color(0xFF7C4DFF) : Colors.white10,
+                    width: 1,
+                  ),
                 ),
                 child: isUser
-                    ? SelectableText(message.content, style: const TextStyle(fontSize: 15, height: 1.4))
+                    ? SelectableText(message.content, style: const TextStyle(fontSize: 15, height: 1.5, color: Colors.white))
                     : _AssistantContent(content: message.content, isStreaming: isStreaming),
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  void _showActionMenu(BuildContext context, bool isUser) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF161B22),
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.copy, color: Colors.white),
+                title: const Text('Salin Pesan', style: TextStyle(color: Colors.white)),
+                onTap: () async {
+                  await Clipboard.setData(ClipboardData(text: message.content));
+                  if (context.mounted) Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pesan disalin')));
+                },
+              ),
+              if (isUser && onEdit != null)
+                ListTile(
+                  leading: const Icon(Icons.edit, color: Colors.white),
+                  title: const Text('Edit Pesan', style: TextStyle(color: Colors.white)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    onEdit!();
+                  },
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -156,12 +198,42 @@ class _AssistantContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final parts = content.split('```');
+    // Cek apakah AI sedang dalam proses berpikir
+    final openThink = RegExp(r'<think(?:ing)?>', caseSensitive: false);
+    final closeThink = RegExp(r'</think(?:ing)?>', caseSensitive: false);
+    
+    bool isThinking = false;
+    String mainText = content;
+
+    if (openThink.hasMatch(content) && !closeThink.hasMatch(content)) {
+      isThinking = true; // Masih di dalam blok think
+    } else if (closeThink.hasMatch(content)) {
+      // Hapus semua tag think dan isinya
+      mainText = content.replaceAll(RegExp(r'<think(?:ing)?>[\s\S]*?</think(?:ing)?>', caseSensitive: false), '').trim();
+    } else {
+      // Jika tidak ada tag think sama sekali
+      mainText = content;
+    }
+
+    // Bersihkan prefix "Assistant:" atau "User:"
+    mainText = mainText.replaceAll(RegExp(r'^(Assistant|User|AI):\s*', caseSensitive: false), '');
+
+    if (isThinking) {
+      return const ThinkingAnimation();
+    }
+
+    final parts = mainText.split('```');
     final widgets = <Widget>[];
+
     for (int i = 0; i < parts.length; i++) {
       if (i.isEven) {
         final t = parts[i];
-        if (t.trim().isNotEmpty) widgets.add(SelectableText(t, style: const TextStyle(fontSize: 15, height: 1.4)));
+        if (t.trim().isNotEmpty) {
+          widgets.add(Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: SelectableText(t.trim(), style: const TextStyle(fontSize: 15, height: 1.5, color: Colors.white)),
+          ));
+        }
       } else {
         final lines = parts[i].split('\n');
         final lang = lines.first.trim();
@@ -169,9 +241,53 @@ class _AssistantContent extends StatelessWidget {
         if (code.isNotEmpty) widgets.add(CodeBlock(code: code, language: lang));
       }
     }
-    if (isStreaming) {
+
+    if (isStreaming && !isThinking && mainText.trim().isNotEmpty) {
       widgets.add(const Padding(padding: EdgeInsets.only(top: 8), child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))));
     }
+
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: widgets);
+  }
+}
+
+// Widget Animasi Loading Berpikir
+class ThinkingAnimation extends StatefulWidget {
+  const ThinkingAnimation({super.key});
+
+  @override
+  State<ThinkingAnimation> createState() => _ThinkingAnimationState();
+}
+
+class _ThinkingAnimationState extends State<ThinkingAnimation> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 1))..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        RotationTransition(
+          turns: _controller,
+          child: const Icon(Icons.autorenew, size: 18, color: Colors.deepPurpleAccent),
+        ),
+        const SizedBox(width: 8),
+        const Text(
+          'xdfaaa ai sedang berpikir...',
+          style: TextStyle(fontStyle: FontStyle.italic, color: Colors.white54, fontSize: 13),
+        ),
+      ],
+    );
   }
 }
