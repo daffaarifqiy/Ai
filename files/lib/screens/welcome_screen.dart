@@ -10,31 +10,29 @@ class WelcomeScreen extends StatefulWidget {
 }
 
 class _WelcomeScreenState extends State<WelcomeScreen> {
-  bool _checking = true;
-  String _status = 'Memeriksa sistem...';
+  String _status = 'Siap memulai.';
+  bool _isLoading = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _initApp();
-  }
+  Future<void> _startAI() async {
+    setState(() {
+      _isLoading = true;
+      _status = 'Memeriksa izin...';
+    });
 
-  Future<void> _initApp() async {
     try {
-      // Memberikan efek loading sebentar
-      await Future.delayed(const Duration(seconds: 2));
-      
       bool hasPerm = await PermissionService.hasStorage();
       if (!hasPerm) {
-        setState(() => _status = 'Menunggu izin penyimpanan...');
         hasPerm = await PermissionService.requestStorage();
         if (!hasPerm) {
-          setState(() => _status = 'Izin ditolak.\nBuka pengaturan dan izinkan akses penyimpanan.');
+          setState(() {
+            _isLoading = false;
+            _status = 'Izin ditolak. Buka pengaturan HP dan izinkan akses penyimpanan.';
+          });
           return;
         }
       }
 
-      setState(() => _status = 'Memuat AI...');
+      setState(() => _status = 'Memeriksa model...');
       bool modelReady = await ModelService.isModelDownloaded();
 
       if (!modelReady) {
@@ -48,9 +46,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         });
       }
 
-      setState(() => _status = 'Menyiapkan mesin AI...');
+      setState(() => _status = 'Memuat mesin AI...');
       
-      // Jika library C++ crash, try-catch ini akan mencegah aplikasi tertutup
+      // Bagian ini paling rawan crash (Native Library)
       final controller = await ModelService.loadModel();
       
       if (mounted) {
@@ -60,15 +58,16 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _status = 'Gagal memuat AI:\n$e\n\nPastikan HP memiliki RAM yang cukup dan coba buka ulang aplikasi.');
+        setState(() {
+          _isLoading = false;
+          _status = 'Gagal memuat AI:\n$e\n\nPastikan HP memiliki RAM yang cukup.';
+        });
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final isError = _status.contains('Gagal') || _status.contains('ditolak');
-
     return Scaffold(
       body: Center(
         child: Padding(
@@ -89,12 +88,24 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               const Text('Athailla Daffa Arifqiy', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
               const SizedBox(height: 48),
               
-              isError 
-                  ? const Icon(Icons.error_outline, color: Colors.redAccent, size: 48)
-                  : const CircularProgressIndicator(),
-                  
+              if (_isLoading) 
+                const CircularProgressIndicator()
+              else
+                FilledButton.icon(
+                  onPressed: _startAI,
+                  icon: const Icon(Icons.play_arrow),
+                  label: const Text('Mulai AI'),
+                ),
+              
               const SizedBox(height: 24),
-              Text(_status, textAlign: TextAlign.center, style: TextStyle(color: isError ? Colors.redAccent : Colors.white54, fontSize: 14)),
+              Text(
+                _status, 
+                textAlign: TextAlign.center, 
+                style: TextStyle(
+                  color: _status.contains('Gagal') || _status.contains('ditolak') ? Colors.redAccent : Colors.white54, 
+                  fontSize: 14
+                )
+              ),
             ],
           ),
         ),
