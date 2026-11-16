@@ -1,0 +1,3 @@
+-keep class com.write4me.llama_flutter_android.** { *; }
+-keep class kotlin.jvm.functions.Function1
+-keepclasseswithmembernames class * { native <methods>; }
