@@ -28,17 +28,27 @@ jobs:
 
       - name: Scaffold Android project
         run: |
+          # HAPUS FOLDER ANDROID LAMA (Mencegah nested copy)
+          rm -rf android
+          
           flutter create --platforms=android --org com.xdfaaa --project-name xdfaaa_ai /tmp/scaffold
           cp -r /tmp/scaffold/android ./android
           cp -r android_overrides/. android/
 
-      # ⬇️ TAMBAHAN BARU: Memperbaiki versi Kotlin & Android Gradle Plugin otomatis
       - name: Fix Kotlin and AGP Version
         run: |
-          # Ubah Kotlin ke 2.1.0 (sesuai plugin llama)
-          sed -i 's/id "org.jetbrains.kotlin.android" version "[^"]*"/id "org.jetbrains.kotlin.android" version "2.1.0"/' android/settings.gradle
-          # Ubah AGP ke 8.7.0 (agar support compileSdk 35)
-          sed -i 's/id "com.android.application" version "[^"]*"/id "com.android.application" version "8.7.0"/' android/settings.gradle
+          # Cek apakah file menggunakan format Groovy (.gradle) atau Kotlin (.kts)
+          if [ -f android/settings.gradle ]; then
+            echo "Memperbaiki settings.gradle..."
+            sed -i 's/id "org.jetbrains.kotlin.android" version "[^"]*"/id "org.jetbrains.kotlin.android" version "2.1.0"/g' android/settings.gradle
+            sed -i 's/id "com.android.application" version "[^"]*"/id "com.android.application" version "8.7.0"/g' android/settings.gradle
+          fi
+          
+          if [ -f android/settings.gradle.kts ]; then
+            echo "Memperbaiki settings.gradle.kts..."
+            sed -i 's/id("org.jetbrains.kotlin.android") version "[^"]*"/id("org.jetbrains.kotlin.android") version "2.1.0"/g' android/settings.gradle.kts
+            sed -i 's/id("com.android.application") version "[^"]*"/id("com.android.application") version "8.7.0"/g' android/settings.gradle.kts
+          fi
 
       - name: Copy PNG Assets
         run: cp ../assets/*.png ./
