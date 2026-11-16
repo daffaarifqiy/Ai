@@ -8,6 +8,12 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    
+    # INI KUNCI UTAMANYA: Semua perintah dijalankan di dalam folder 'files'
+    defaults:
+      run:
+        working-directory: files
+
     steps:
       - uses: actions/checkout@v4
 
@@ -27,14 +33,18 @@ jobs:
           cp -r /tmp/scaffold/android ./android
           cp -r android_overrides/. android/
 
-      - run: flutter pub get
+      - name: Get dependencies
+        run: flutter pub get
 
       - name: Generate launcher icons
         run: dart run flutter_launcher_icons
 
-      - run: flutter build apk --release
+      - name: Build APK
+        run: flutter build apk --release
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
           name: xdfaaa-ai-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          # Path APK juga disesuaikan karena sekarang berada di dalam folder 'files'
+          path: files/build/app/outputs/flutter-apk/app-release.apk
