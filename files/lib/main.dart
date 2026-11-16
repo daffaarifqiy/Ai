@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'screens/setup_screen.dart';
+import 'screens/welcome_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -10,7 +10,8 @@ Future<void> main() async {
     statusBarIconBrightness: Brightness.light,
   ));
   await Hive.initFlutter();
-  await Hive.openBox('messages');
+  await Hive.openBox('chat_sessions');
+  await Hive.openBox('chat_messages');
   runApp(const XdfaaaApp());
 }
 
@@ -32,7 +33,7 @@ class XdfaaaApp extends StatelessWidget {
           elevation: 0,
         ),
       ),
-      home: const SetupScreen(),
+      home: const WelcomeScreen(),
     );
   }
 }
