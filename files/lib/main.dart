@@ -11,13 +11,12 @@ Future<void> main() async {
     statusBarIconBrightness: Brightness.light,
   ));
 
-  // Cegah crash jika Hive gagal inisialisasi
   try {
     await Hive.initFlutter();
     await Hive.openBox('chat_sessions');
     await Hive.openBox('chat_messages');
   } catch (e) {
-    debugPrint('Peringatan: Gagal inisialisasi database lokal - $e');
+    debugPrint('Gagal inisialisasi database: $e');
   }
 
   runApp(const XdfaaaApp());
