@@ -21,15 +21,26 @@ jobs:
           flutter-version: '3.29.3' 
           channel: stable
 
-      - name: Scaffold and Merge
+      - name: Prepare Project
         run: |
-          flutter create --platforms=android --org com.xdfaaa --project-name xdfaaa_ai /tmp/scaffold
-          cp -r /tmp/scaffold/android ./android
+          # 1. Buat project Flutter bersih di folder /tmp/app
+          flutter create --platforms=android --org com.xdfaaa --project-name xdfaaa_ai /tmp/app
           
-          rm -f android/settings.gradle android/settings.gradle.kts
-          rm -f android/build.gradle android/build.gradle.kts
-          
-          cat << 'EOF' > android/settings.gradle
+          # 2. Salin file dari repo user ke folder /tmp/app
+          # (Script ini otomatis mendeteksi apakah file ada di root atau di dalam folder 'files')
+          if [ -f "pubspec.yaml" ]; then
+            echo "Menyalin file dari ROOT repo..."
+            cp -r pubspec.yaml lib assets /tmp/app/ 2>/dev/null || true
+          elif [ -d "files" ]; then
+            echo "Menyalin file dari folder 'files'..."
+            cp -r files/pubspec.yaml files/lib files/assets /tmp/app/ 2>/dev/null || true
+          else
+            echo "❌ ERROR: Tidak dapat menemukan pubspec.yaml di root atau di folder 'files'!"
+            exit 1
+          fi
+
+          # 3. Tulis ulang konfigurasi Android (SDK 35, Kotlin 2.1.0)
+          cat << 'EOF' > /tmp/app/android/settings.gradle
           pluginManagement {
               def flutterSdkPath = {
                   def properties = new Properties()
@@ -53,7 +64,7 @@ jobs:
           include ":app"
           EOF
 
-          cat << 'EOF' > android/build.gradle
+          cat << 'EOF' > /tmp/app/android/build.gradle
           allprojects {
               repositories {
                   google()
@@ -72,7 +83,7 @@ jobs:
           }
           EOF
 
-          cat << 'EOF' > android/app/build.gradle
+          cat << 'EOF' > /tmp/app/android/app/build.gradle
           plugins {
               id "com.android.application"
               id "kotlin-android"
@@ -91,8 +102,8 @@ jobs:
                   applicationId = "com.xdfaaa.ai"
                   minSdk = 26
                   targetSdk = 35
-                  versionCode = 2
-                  versionName = "1.1.0"
+                  versionCode = 3
+                  versionName = "1.2.0"
               }
               buildTypes {
                   release {
@@ -105,7 +116,7 @@ jobs:
           flutter { source = '../..' }
           EOF
 
-          cat << 'EOF' > android/app/src/main/AndroidManifest.xml
+          cat << 'EOF' > /tmp/app/android/app/src/main/AndroidManifest.xml
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.INTERNET" />
               <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
@@ -137,16 +148,19 @@ jobs:
           EOF
 
       - name: Get dependencies
+        working-directory: /tmp/app
         run: flutter pub get
 
       - name: Generate launcher icons
+        working-directory: /tmp/app
         run: dart run flutter_launcher_icons
 
       - name: Build APK
+        working-directory: /tmp/app
         run: flutter build apk --release
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: xdfaaa-ai-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: /tmp/app/build/app/outputs/flutter-apk/app-release.apk
