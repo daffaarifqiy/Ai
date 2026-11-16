@@ -125,10 +125,8 @@ class MessageBubble extends StatelessWidget {
               backgroundColor: Colors.deepPurpleAccent.withOpacity(0.2),
               child: ClipOval(
                 child: Image.asset(
-                  'assets/ai.jpg.png', // <-- DIUBAH DI SINI
-                  width: 36, 
-                  height: 36, 
-                  fit: BoxFit.cover, 
+                  'assets/ai.jpg.png',
+                  width: 36, height: 36, fit: BoxFit.cover, 
                   errorBuilder: (_, __, ___) => const Icon(Icons.smart_toy, color: Colors.deepPurpleAccent),
                 ),
               ),
