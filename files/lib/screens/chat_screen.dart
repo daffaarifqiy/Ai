@@ -56,7 +56,7 @@ class _ChatScreenState extends State<ChatScreen> {
       _currentSession = session;
       _messages = ChatStorage.getMessages(session.id);
     });
-    Navigator.pop(context); // Tutup drawer
+    Navigator.pop(context);
     _scrollToBottom();
   }
 
@@ -73,23 +73,58 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  Future<void> _send() async {
+  // ==========================================
+  // LOGIKA UTAMA: KIRIM & EDIT PESAN
+  // ==========================================
+  
+  Future<void> _sendMessage() async {
     final text = _input.text.trim();
     if (text.isEmpty || _generating || _currentSession == null) return;
     _input.clear();
 
     final userMsg = ChatMessage(role: 'user', content: text);
-    final botMsg = ChatMessage(role: 'assistant', content: '');
-    
     setState(() {
       _messages.add(userMsg);
-      _messages.add(botMsg);
-      _generating = true;
     });
     
     await ChatStorage.saveMessage(_currentSession!.id, userMsg);
     _scrollToBottom();
+    
+    await _generateAIResponse();
+  }
 
+  void _editMessage(int index, String newText) {
+    if (_generating) return;
+
+    // 1. Potong history chat dari pesan yang diedit (hapus pesan lama & balasan AI setelahnya)
+    final truncatedMessages = _messages.sublist(0, index);
+    
+    // 2. Buat pesan baru yang sudah diedit
+    final editedMsg = ChatMessage(role: 'user', content: newText);
+    truncatedMessages.add(editedMsg);
+
+    setState(() {
+      _messages = truncatedMessages;
+    });
+
+    // 3. Simpan state baru ke Hive (overwrite)
+    ChatStorage.overwriteMessages(_currentSession!.id, _messages);
+    
+    // 4. Minta AI merespons ulang
+    _generateAIResponse();
+  }
+
+  Future<void> _generateAIResponse() async {
+    if (_currentSession == null) return;
+
+    final botMsg = ChatMessage(role: 'assistant', content: '');
+    setState(() {
+      _messages.add(botMsg);
+      _generating = true;
+    });
+    _scrollToBottom();
+
+    // Ambil 10 pesan terakhir untuk konteks
     final hist = _messages.where((m) => m.id != botMsg.id).toList();
     final recent = hist.length > 10 ? hist.sublist(hist.length - 10) : hist;
 
@@ -102,7 +137,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _sub = widget.controller.generateChat(
       messages: chatHistory,
       template: 'chatml',
-      maxTokens: 2048, // Ditingkatkan untuk kode
+      maxTokens: 2048,
       temperature: 0.7,
     ).listen(
       (token) {
@@ -175,6 +210,10 @@ class _ChatScreenState extends State<ChatScreen> {
                       return MessageBubble(
                         message: _messages[i],
                         isStreaming: _generating && last && _messages[i].role == 'assistant',
+                        // Tambahkan callback edit khusus untuk pesan user
+                        onEdit: _messages[i].role == 'user' && !_generating
+                            ? () => _showEditDialog(i, _messages[i].content)
+                            : null,
                       );
                     },
                   ),
@@ -202,12 +241,49 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   const SizedBox(width: 8),
                   IconButton.filled(
-                    onPressed: _generating ? null : _send,
+                    onPressed: _generating ? null : _sendMessage,
                     icon: const Icon(Icons.send),
                   ),
                 ],
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Dialog untuk mengedit pesan
+  void _showEditDialog(int index, String currentText) {
+    final editCtrl = TextEditingController(text: currentText);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF161B22),
+        title: const Text('Edit Pesan', style: TextStyle(color: Colors.white)),
+        content: TextField(
+          controller: editCtrl,
+          maxLines: null,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            filled: true,
+            fillColor: Color(0xFF0D1117),
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal', style: TextStyle(color: Colors.white54)),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              if (editCtrl.text.trim().isNotEmpty && editCtrl.text != currentText) {
+                _editMessage(index, editCtrl.text.trim());
+              }
+            },
+            child: const Text('Simpan & Kirim Ulang'),
           ),
         ],
       ),
