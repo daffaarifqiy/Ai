@@ -1,9 +1,4 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-
-import '../services/app_services.dart';
-import '../services/github_service.dart';
 import '../services/settings_service.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -14,158 +9,188 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  final _pinCtrl = TextEditingController();
   final _tokenCtrl = TextEditingController();
   final _repoCtrl = TextEditingController();
-  bool _busy = false;
-  String? _status;
+  
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _loadCurrentSettings();
   }
 
-  Future<void> _load() async {
-    _tokenCtrl.text = await SettingsService.getToken();
-    _repoCtrl.text = await SettingsService.getRepoUrl();
-    setState(() {});
-  }
+  Future<void> _loadCurrentSettings() async {
+    // Ambil data yang sudah tersimpan sebelumnya
+    final currentPin = await SettingsService.getPassword();
+    final currentToken = await SettingsService.getGithubToken();
+    final currentRepo = await SettingsService.getGithubRepo();
 
-  Future<void> _save() async {
-    await SettingsService.saveGitHub(
-      token: _tokenCtrl.text,
-      repoUrl: _repoCtrl.text,
-    );
-    setState(() => _status = 'Disimpan');
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pengaturan GitHub disimpan')),
-      );
+      setState(() {
+        _pinCtrl.text = currentPin;
+        _tokenCtrl.text = currentToken;
+        _repoCtrl.text = currentRepo;
+        _isLoading = false;
+      });
     }
   }
 
-  Future<void> _test() async {
-    setState(() {
-      _busy = true;
-      _status = 'Menguji koneksi...';
-    });
-    final ok = await GitHubService.testConnection(
+  Future<void> _savePin() async {
+    final newPin = _pinCtrl.text.trim();
+    if (newPin.length < 4) {
+      _showSnackBar('PIN minimal 4 digit', isError: true);
+      return;
+    }
+    await SettingsService.setPassword(newPin);
+    _showSnackBar('PIN berhasil diperbarui');
+  }
+
+  Future<void> _saveGithub() async {
+    await SettingsService.saveGithubConfig(
       token: _tokenCtrl.text.trim(),
       repoUrl: _repoCtrl.text.trim(),
     );
-    setState(() {
-      _busy = false;
-      _status = ok ? 'Koneksi berhasil ✓' : 'Koneksi gagal ✗';
-    });
+    _showSnackBar('Konfigurasi GitHub disimpan');
   }
 
-  Future<void> _backup() async {
-    final token = _tokenCtrl.text.trim();
-    final repo = _repoCtrl.text.trim();
-    if (token.isEmpty || repo.isEmpty) {
-      setState(() => _status = 'Isi token & repo dulu');
-      return;
-    }
-    setState(() {
-      _busy = true;
-      _status = 'Mengunggah backup...';
-    });
-    try {
-      final data = ChatStorage.loadAll().map((m) => m.toMap()).toList();
-      final json = const JsonEncoder.withIndent('  ').convert({
-        'app': 'xdfaaa ai',
-        'exported_at': DateTime.now().toIso8601String(),
-        'messages': data,
-      });
-      final path = await GitHubService.backupChat(
-        token: token,
-        repoUrl: repo,
-        jsonContent: json,
-      );
-      setState(() {
-        _busy = false;
-        _status = 'Backup tersimpan di $path';
-      });
-    } catch (e) {
-      setState(() {
-        _busy = false;
-        _status = 'Gagal backup: $e';
-      });
-    }
+  void _showSnackBar(String message, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.redAccent : Colors.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pinCtrl.dispose();
+    _tokenCtrl.dispose();
+    _repoCtrl.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Pengaturan')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          const Text('GitHub (untuk backup chat)',
-              style:
-                  TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _tokenCtrl,
-            obscureText: true,
-            decoration: const InputDecoration(
-              labelText: 'GitHub Token (Personal Access Token)',
-              hintText: 'ghp_...',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _repoCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Link Repo GitHub',
-              hintText: 'https://github.com/username/xdfaaa-ai',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: _busy ? null : _save,
-                  icon: const Icon(Icons.save),
-                  label: const Text('Simpan'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _busy ? null : _test,
-                  icon: const Icon(Icons.wifi_tethering),
-                  label: const Text('Test'),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: _busy ? null : _backup,
-            icon: const Icon(Icons.cloud_upload),
-            label: const Text('Backup Chat ke GitHub'),
-          ),
-          if (_status != null) ...[
-            const SizedBox(height: 16),
-            Text(_status!,
-                style: const TextStyle(color: Colors.white70)),
-          ],
-          if (_busy) ...[
-            const SizedBox(height: 16),
-            const Center(child: CircularProgressIndicator()),
-          ],
-          const SizedBox(height: 32),
-          const Text(
-            'Token disimpan lokal di perangkat (SharedPreferences). '
-            'Backup chat akan membuat file di folder backups/ pada repo.',
-            style: TextStyle(fontSize: 12, color: Colors.white38),
-          ),
-        ],
+      appBar: AppBar(
+        title: const Text('Pengaturan'),
       ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                // ==========================================
+                // BAGIAN 1: KEAMANAN (PASSWORD)
+                // ==========================================
+                _buildSectionTitle('Keamanan Aplikasi', Icons.lock_outline),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _pinCtrl,
+                  keyboardType: TextInputType.number,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Password PIN',
+                    hintText: 'Masukkan PIN baru',
+                    prefixIcon: Icon(Icons.password),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _savePin,
+                    icon: const Icon(Icons.save),
+                    label: const Text('Simpan PIN Baru'),
+                  ),
+                ),
+
+                const SizedBox(height: 32),
+                const Divider(color: Colors.white24),
+                const SizedBox(height: 16),
+
+                // ==========================================
+                // BAGIAN 2: GITHUB (BACKUP)
+                // ==========================================
+                _buildSectionTitle('Backup ke GitHub', Icons.cloud_upload_outlined),
+                const SizedBox(height: 8),
+                const Text(
+                  'Masukkan Personal Access Token (PAT) dan URL Repo GitHub kamu. '
+                  'Data ini digunakan untuk mencadangkan riwayat chat secara otomatis.',
+                  style: TextStyle(fontSize: 12, color: Colors.white54),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _tokenCtrl,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'GitHub Token (PAT)',
+                    hintText: 'ghp_xxxxxxxxxxxx',
+                    prefixIcon: Icon(Icons.key),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _repoCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'URL Repo GitHub',
+                    hintText: 'https://github.com/username/repo',
+                    prefixIcon: Icon(Icons.link),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _saveGithub,
+                    icon: const Icon(Icons.cloud_done),
+                    label: const Text('Simpan Konfigurasi GitHub'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.deepPurpleAccent,
+                      side: const BorderSide(color: Colors.deepPurpleAccent),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 32),
+                const Divider(color: Colors.white24),
+                const SizedBox(height: 16),
+
+                // ==========================================
+                // BAGIAN 3: TENTANG APLIKASI
+                // ==========================================
+                _buildSectionTitle('Tentang', Icons.info_outline),
+                const SizedBox(height: 12),
+                const ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.smart_toy, color: Colors.deepPurpleAccent),
+                  title: Text('xdfaaa ai'),
+                  subtitle: Text('Versi 1.2.0\nModel: Qwen2.5-Coder-1.5B'),
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: Colors.deepPurpleAccent),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+      ],
     );
   }
 }
