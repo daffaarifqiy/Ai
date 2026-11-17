@@ -23,10 +23,13 @@ jobs:
 
       - name: Prepare Project
         run: |
-          # 1. Buat project Flutter bersih di folder lokal (./build_src)
+          # 1. Bersihkan folder temporary sebelumnya
+          rm -rf ./build_src
+          
+          # 2. Buat project Flutter baru
           flutter create --platforms=android --org com.xdfaaa --project-name xdfaaa_ai ./build_src
           
-          # 2. Salin file dari repo user ke folder ./build_src
+          # 3. Salin file dari repo user
           if [ -f "pubspec.yaml" ]; then cp pubspec.yaml ./build_src/
           elif [ -f "files/pubspec.yaml" ]; then cp files/pubspec.yaml ./build_src/; fi
 
@@ -37,7 +40,52 @@ jobs:
           if [ -d "assets" ]; then cp -r assets/* ./build_src/assets/ 2>/dev/null || true
           elif [ -d "files/assets" ]; then cp -r files/assets/* ./build_src/assets/ 2>/dev/null || true; fi
 
-          # 3. TULIS ULANG build.gradle secara langsung (Aman & Anti Error)
+          # 4. TIMPA settings.gradle (Paksa Kotlin 2.1.0 & AGP 8.7.0)
+          cat << 'EOF' > ./build_src/android/settings.gradle
+          pluginManagement {
+              def flutterSdkPath = {
+                  def properties = new Properties()
+                  file("local.properties").withInputStream { properties.load(it) }
+                  def flutterSdkPath = properties.getProperty("flutter.sdk")
+                  assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
+                  return flutterSdkPath
+              }()
+              includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          plugins {
+              id "dev.flutter.flutter-plugin-loader" version "1.0.0"
+              id "com.android.application" version "8.7.0" apply false
+              id "org.jetbrains.kotlin.android" version "2.1.0" apply false
+          }
+          include ":app"
+          EOF
+
+          # 5. TIMPA build.gradle (Root)
+          cat << 'EOF' > ./build_src/android/build.gradle
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.buildDir = "../build"
+          subprojects {
+              project.buildDir = "${rootProject.buildDir}/${project.name}"
+          }
+          subprojects {
+              project.evaluationDependsOn(":app")
+          }
+          tasks.register("clean", Delete) {
+              delete rootProject.buildDir
+          }
+          EOF
+
+          # 6. TIMPA build.gradle (App)
           cat << 'EOF' > ./build_src/android/app/build.gradle
           plugins {
               id "com.android.application"
@@ -71,7 +119,7 @@ jobs:
           flutter { source = '../..' }
           EOF
 
-          # 4. TULIS ULANG AndroidManifest.xml (Izin Akses)
+          # 7. TIMPA AndroidManifest.xml
           cat << 'EOF' > ./build_src/android/app/src/main/AndroidManifest.xml
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.INTERNET" />
