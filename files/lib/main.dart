@@ -11,7 +11,7 @@ Future<void> main() async {
     statusBarIconBrightness: Brightness.light,
   ));
 
-  // Mencegah crash jika database lokal bermasalah
+  // Mencegah aplikasi tertutup jika Hive gagal dimuat
   try {
     await Hive.initFlutter();
     await Hive.openBox('chat_sessions');
