@@ -48,7 +48,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
       setState(() => _status = 'Memuat mesin AI...');
       
-      // Bagian ini paling rawan crash (Native Library)
+      // Proses ini memuat library C++ (llama.cpp)
       final controller = await ModelService.loadModel();
       
       if (mounted) {
@@ -95,6 +95,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   onPressed: _startAI,
                   icon: const Icon(Icons.play_arrow),
                   label: const Text('Mulai AI'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
                 ),
               
               const SizedBox(height: 24),
