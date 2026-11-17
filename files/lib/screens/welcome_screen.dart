@@ -68,7 +68,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         setState(() {
           _isLoading = false;
           _isError = true;
-          _status = 'Gagal memuat AI:\nPastikan RAM cukup dan file model tidak korup.';
+          _status = 'Gagal memuat AI:\n$e\n\nPastikan HP memiliki RAM cukup dan file model tidak korup.';
         });
       }
     }
