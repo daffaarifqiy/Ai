@@ -12,10 +12,12 @@ class WelcomeScreen extends StatefulWidget {
 class _WelcomeScreenState extends State<WelcomeScreen> {
   String _status = 'Siap memulai.';
   bool _isLoading = false;
+  bool _isError = false;
 
-  Future<void> _startAI() async {
+  Future<void> _startAI({bool forceDownload = false}) async {
     setState(() {
       _isLoading = true;
+      _isError = false;
       _status = 'Memeriksa izin...';
     });
 
@@ -26,10 +28,16 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         if (!hasPerm) {
           setState(() {
             _isLoading = false;
+            _isError = true;
             _status = 'Izin ditolak. Buka pengaturan HP dan izinkan akses penyimpanan.';
           });
           return;
         }
+      }
+
+      if (forceDownload) {
+        setState(() => _status = 'Menghapus model lama...');
+        await ModelService.deleteModel();
       }
 
       setState(() => _status = 'Memeriksa model...');
@@ -48,7 +56,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
       setState(() => _status = 'Memuat mesin AI...');
       
-      // Proses ini memuat library C++ (llama.cpp)
       final controller = await ModelService.loadModel();
       
       if (mounted) {
@@ -60,7 +67,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _status = 'Gagal memuat AI:\n$e\n\nPastikan HP memiliki RAM yang cukup.';
+          _isError = true;
+          _status = 'Gagal memuat AI:\nPastikan RAM cukup dan file model tidak korup.';
         });
       }
     }
@@ -90,9 +98,22 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               
               if (_isLoading) 
                 const CircularProgressIndicator()
+              else if (_isError)
+                Column(
+                  children: [
+                    const Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
+                    const SizedBox(height: 16),
+                    FilledButton.icon(
+                      onPressed: () => _startAI(forceDownload: true),
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Hapus Model & Unduh Ulang'),
+                      style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+                    ),
+                  ],
+                )
               else
                 FilledButton.icon(
-                  onPressed: _startAI,
+                  onPressed: () => _startAI(),
                   icon: const Icon(Icons.play_arrow),
                   label: const Text('Mulai AI'),
                   style: FilledButton.styleFrom(
@@ -105,10 +126,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               Text(
                 _status, 
                 textAlign: TextAlign.center, 
-                style: TextStyle(
-                  color: _status.contains('Gagal') || _status.contains('ditolak') ? Colors.redAccent : Colors.white54, 
-                  fontSize: 14
-                )
+                style: const TextStyle(color: Colors.white54, fontSize: 14)
               ),
             ],
           ),
