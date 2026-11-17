@@ -38,7 +38,7 @@ class ChatMessage {
 class ChatSession {
   final String id;
   final String title;
-  final String? projectName; // Tambahan untuk Project Mode
+  final String? projectName;
   final DateTime createdAt;
 
   ChatSession({
@@ -65,7 +65,7 @@ class ChatSession {
 
 class ProjectService {
   static Future<Directory> getProjectsDir() async {
-    final base = await getExternalStorageDirectory() ?? await getApplicationDocumentsDirectory();
+    final base = await getApplicationDocumentsDirectory();
     final dir = Directory('${base.path}/xdfaaa_projects');
     if (!await dir.exists()) await dir.create(recursive: true);
     return dir;
@@ -163,10 +163,14 @@ class PermissionService {
 class ModelService {
   static const String modelUrl = 'https://huggingface.co/huihui-ai/Qwen2.5-Coder-1.5B-Instruct-abliterated-GGUF/resolve/main/Qwen2.5-Coder-1.5B-Instruct-abliterated.Q4_K_M.gguf';
   static const String modelFileName = 'qwen2.5-coder-1.5b-abliterated.gguf';
-  static const int minValidSize = 100000000;
+  
+  // DITINGKATKAN: Model asli berukuran ~1.1 GB. Minimal harus > 1.000.000.000 bytes
+  static const int minValidSize = 1000000000; 
 
   static Future<Directory> getModelDir() async {
-    final base = await getExternalStorageDirectory() ?? await getApplicationDocumentsDirectory();
+    // DIUBAH: Gunakan ApplicationDocumentsDirectory (Internal Storage)
+    // Agar library C++ dijamin bisa membaca file tanpa masalah izin Android.
+    final base = await getApplicationDocumentsDirectory();
     final dir = Directory('${base.path}/xdfaaa_ai_models');
     if (!await dir.exists()) await dir.create(recursive: true);
     return dir;
@@ -177,6 +181,12 @@ class ModelService {
   static Future<bool> isModelDownloaded() async {
     final f = File(await getModelPath());
     return await f.exists() && await f.length() > minValidSize;
+  }
+
+  // TAMBAHAN: Fungsi untuk menghapus model yang korup
+  static Future<void> deleteModel() async {
+    final f = File(await getModelPath());
+    if (await f.exists()) await f.delete();
   }
 
   static Future<void> downloadModel({required void Function(int received, int total) onProgress}) async {
