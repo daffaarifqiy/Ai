@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:llama_flutter_android/llama_flutter_android.dart' as llama;
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ChatMessage {
   final String id;
@@ -81,11 +82,42 @@ class ProjectService {
     final newFolder = Directory('${dir.path}/$name');
     if (!await newFolder.exists()) await newFolder.create();
   }
+
+  static Future<List<File>> getFilesInProject(String projectName) async {
+    final dir = await getProjectsDir();
+    final folder = Directory('${dir.path}/$projectName');
+    if (!await folder.exists()) return [];
+    return folder.list().where((e) => e is File).map((e) => e as File).toList();
+  }
+
+  static Future<File> addFileToProject(String projectName, File file) async {
+    final dir = await getProjectsDir();
+    final folder = Directory('${dir.path}/$projectName');
+    if (!await folder.exists()) await folder.create(recursive: true);
+    
+    final newPath = '${folder.path}/${file.uri.pathSegments.last}';
+    return await file.copy(newPath);
+  }
+
+  static Future<void> deleteFile(String projectName, File file) async {
+    if (await file.exists()) await file.delete();
+  }
 }
 
 class ChatStorage {
   static const String _boxSessions = 'chat_sessions';
   static const String _boxMessages = 'chat_messages';
+  static const String _keyLastSession = 'last_session_id';
+
+  static Future<void> saveLastSessionId(String id) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyLastSession, id);
+  }
+
+  static Future<String?> getLastSessionId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyLastSession);
+  }
 
   static Future<ChatSession> createSession({String? projectName}) async {
     final session = ChatSession(
@@ -95,6 +127,7 @@ class ChatStorage {
       createdAt: DateTime.now(),
     );
     await Hive.box(_boxSessions).put(session.id, session.toMap());
+    await saveLastSessionId(session.id);
     return session;
   }
 
@@ -141,6 +174,7 @@ class ChatStorage {
   static Future<void> deleteSession(String sessionId) async {
     await Hive.box(_boxSessions).delete(sessionId);
     await Hive.box(_boxMessages).delete(sessionId);
+    await saveLastSessionId('');
   }
 }
 
@@ -161,17 +195,11 @@ class PermissionService {
 }
 
 class ModelService {
-  // ==========================================
-  // PERUBAHAN MODEL DI SINI (Qwen2.5-Coder-1.5B Q4_K_M)
-  // ==========================================
   static const String modelUrl = 'https://huggingface.co/bartowski/Qwen2.5-Coder-1.5B-Instruct-abliterated-GGUF/resolve/main/Qwen2.5-Coder-1.5B-Instruct-abliterated-Q4_K_M.gguf';
   static const String modelFileName = 'qwen2.5-coder-1.5b-abliterated-q4_k_m.gguf';
-  
-  // Ukuran Q4_K_M sekitar 1.04 GB, jadi validasi minimal 1.000.000.000 bytes (1 GB)
   static const int minValidSize = 1000000000; 
 
   static Future<Directory> getModelDir() async {
-    // Menggunakan ApplicationDocumentsDirectory (Internal Storage)
     final base = await getApplicationDocumentsDirectory();
     final dir = Directory('${base.path}/xdfaaa_ai_models');
     if (!await dir.exists()) await dir.create(recursive: true);
@@ -220,7 +248,6 @@ class ModelService {
       gpuLayers = gpu.recommendedGpuLayers;
     } catch (_) {}
     
-    // contextSize 2048 agar aman dari Out of Memory (OOM) di HP
     await c.loadModel(
       modelPath: path, 
       threads: 4, 
