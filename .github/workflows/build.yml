@@ -54,8 +54,8 @@ jobs:
           }
           plugins {
               id "dev.flutter.flutter-plugin-loader" version "1.0.0"
-              id "com.android.application" version "8.7.0" apply false
-              id "org.jetbrains.kotlin.android" version "2.1.0" apply false
+              id "com.android.application" version "8.13.0" apply false
+              id "org.jetbrains.kotlin.android" version "2.2.20" apply false
           }
           include ":app"
           EOF
@@ -87,7 +87,7 @@ jobs:
           }
           android {
               namespace = "com.xdfaaa.xdfaaa_ai"
-              compileSdk = 35
+              compileSdk = 36
               ndkVersion = "27.0.12077973"
               compileOptions {
                   sourceCompatibility = JavaVersion.VERSION_17
@@ -97,9 +97,9 @@ jobs:
               defaultConfig {
                   applicationId = "com.xdfaaa.xdfaaa_ai"
                   minSdk = 26
-                  targetSdk = 35
-                  versionCode = 8
-                  versionName = "1.5.0"
+                  targetSdk = 36
+                  versionCode = 9
+                  versionName = "1.5.1"
               }
               buildTypes {
                   release {
