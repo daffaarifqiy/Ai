@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'screens/lock_screen.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
@@ -10,7 +11,15 @@ void main() {
     statusBarIconBrightness: Brightness.light,
   ));
 
-  // Langsung jalankan aplikasi tanpa inisialisasi berat
+  // Mencegah crash jika database lokal bermasalah
+  try {
+    await Hive.initFlutter();
+    await Hive.openBox('chat_sessions');
+    await Hive.openBox('chat_messages');
+  } catch (e) {
+    debugPrint('Peringatan Database: $e');
+  }
+
   runApp(const XdfaaaApp());
 }
 
@@ -31,6 +40,14 @@ class XdfaaaApp extends StatelessWidget {
           backgroundColor: Color(0xFF161B22),
           elevation: 0,
           centerTitle: true,
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: const Color(0xFF161B22),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
         ),
       ),
       home: const LockScreen(), 
