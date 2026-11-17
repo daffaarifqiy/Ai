@@ -32,20 +32,34 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    _loadSessions();
+    _loadInitialSession();
   }
 
-  void _loadSessions() {
+  Future<void> _loadInitialSession() async {
     _sessions = ChatStorage.getSessions();
+    final lastId = await ChatStorage.getLastSessionId();
+
+    if (lastId != null && lastId.isNotEmpty) {
+      final found = _sessions.where((s) => s.id == lastId).toList();
+      if (found.isNotEmpty) {
+        _currentSession = found.first;
+        _messages = ChatStorage.getMessages(_currentSession!.id);
+        if (_currentSession!.projectName != null) {
+          _activeProject = _currentSession!.projectName;
+          _currentMode = AIMode.project;
+        }
+        setState(() {});
+        _scrollToBottom();
+        return;
+      }
+    }
+
     if (_sessions.isNotEmpty) {
       _currentSession = _sessions.first;
       _messages = ChatStorage.getMessages(_currentSession!.id);
-      if (_currentSession!.projectName != null) {
-        _activeProject = _currentSession!.projectName;
-        _currentMode = AIMode.project;
-      }
+      await ChatStorage.saveLastSessionId(_currentSession!.id);
     } else {
-      _createNewChat();
+      await _createNewChat();
     }
     setState(() {});
     _scrollToBottom();
@@ -65,10 +79,11 @@ class _ChatScreenState extends State<ChatScreen> {
         _currentMode = AIMode.fast;
       }
     });
+    await ChatStorage.saveLastSessionId(newSess.id);
     _scrollToBottom();
   }
 
-  void _openSession(ChatSession session) {
+  void _openSession(ChatSession session) async {
     setState(() {
       _currentSession = session;
       _messages = ChatStorage.getMessages(session.id);
@@ -80,13 +95,14 @@ class _ChatScreenState extends State<ChatScreen> {
         _currentMode = AIMode.fast;
       }
     });
+    await ChatStorage.saveLastSessionId(session.id);
     Navigator.pop(context);
     _scrollToBottom();
   }
 
   void _deleteSession(ChatSession session) async {
     await ChatStorage.deleteSession(session.id);
-    _loadSessions();
+    _loadInitialSession();
   }
 
   void _scrollToBottom() {
