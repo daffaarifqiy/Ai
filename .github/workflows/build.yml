@@ -36,7 +36,6 @@ jobs:
           if [ -d "assets" ]; then cp -r assets/* ./build_src/assets/ 2>/dev/null || true
           elif [ -d "files/assets" ]; then cp -r files/assets/* ./build_src/assets/ 2>/dev/null || true; fi
 
-          # KONFIGURASI ANDROID
           cat << 'EOF' > ./build_src/android/settings.gradle
           pluginManagement {
               def flutterSdkPath = {
@@ -88,7 +87,7 @@ jobs:
           }
           android {
               namespace = "com.xdfaaa.xdfaaa_ai"
-              compileSdk = 36
+              compileSdk = 35
               ndkVersion = "27.0.12077973"
               compileOptions {
                   sourceCompatibility = JavaVersion.VERSION_17
@@ -98,9 +97,9 @@ jobs:
               defaultConfig {
                   applicationId = "com.xdfaaa.xdfaaa_ai"
                   minSdk = 26
-                  targetSdk = 36
-                  versionCode = 7
-                  versionName = "1.4.0"
+                  targetSdk = 35
+                  versionCode = 8
+                  versionName = "1.5.0"
               }
               buildTypes {
                   release {
@@ -113,14 +112,16 @@ jobs:
           flutter { source = '../..' }
           EOF
 
-          # TAMBAHAN IZIN KAMERA DI MANIFEST
           cat << 'EOF' > ./build_src/android/app/src/main/AndroidManifest.xml
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.INTERNET" />
               <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
               <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
               <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
-              <uses-permission android:name="android.permission.CAMERA" /> <!-- IZIN KAMERA -->
+              <uses-permission android:name="android.permission.CAMERA" />
+              <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+              <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+              <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
               <application
                   android:label="xdfaaa ai"
                   android:name="${applicationName}"
