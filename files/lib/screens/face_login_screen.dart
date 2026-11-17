@@ -1,9 +1,8 @@
 import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
+import 'package:face_verification/face_verification.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:image/image.dart' as img;
 import 'welcome_screen.dart';
 
 class FaceLoginScreen extends StatefulWidget {
@@ -16,12 +15,23 @@ class FaceLoginScreen extends StatefulWidget {
 class _FaceLoginScreenState extends State<FaceLoginScreen> {
   CameraController? _controller;
   bool _isProcessing = false;
+  bool _isInitialized = false;
   String _status = 'Memuat kamera...';
 
   @override
   void initState() {
     super.initState();
+    _initFaceVerification();
     _initCamera();
+  }
+
+  Future<void> _initFaceVerification() async {
+    try {
+      await FaceVerification.instance.init();
+      _isInitialized = true;
+    } catch (e) {
+      setState(() => _status = 'Gagal inisialisasi AI Wajah: $e');
+    }
   }
 
   Future<void> _initCamera() async {
@@ -31,7 +41,6 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
         setState(() => _status = 'Kamera tidak ditemukan');
         return;
       }
-      // Gunakan kamera depan
       final frontCamera = cameras.firstWhere(
         (c) => c.lensDirection == CameraLensDirection.front,
         orElse: () => cameras.first,
@@ -46,37 +55,40 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
   }
 
   Future<void> _scanFace() async {
-    if (_controller == null || !_controller!.value.isInitialized || _isProcessing) return;
+    if (!_isInitialized || _controller == null || !_controller!.value.isInitialized || _isProcessing) return;
 
     setState(() {
       _isProcessing = true;
       _status = 'Memindai wajah...';
     });
 
-    final faceDetector = FaceDetector(
-      options: FaceDetectorOptions(performanceMode: FaceDetectorMode.fast),
-    );
-
     try {
       final image = await _controller!.takePicture();
-      final inputImage = InputImage.fromFilePath(image.path);
+      
+      // Pastikan admin terdaftar (hanya dilakukan sekali atau jika belum ada)
+      final isAdminRegistered = await FaceVerification.instance.isFaceRegistered('admin');
+      if (!isAdminRegistered) {
+        final byteData = await DefaultAssetBundle.of(context).load('assets/admin.png');
+        final tempDir = await getTemporaryDirectory();
+        final adminFile = File('${tempDir.path}/admin_temp.png');
+        await adminFile.writeAsBytes(byteData.buffer.asUint8List());
 
-      final faces = await faceDetector.processImage(inputImage);
-
-      if (faces.isEmpty) {
-        setState(() {
-          _isProcessing = false;
-          _status = 'Wajah tidak terdeteksi. Coba lagi.';
-        });
-        await faceDetector.close();
-        return;
+        await FaceVerification.instance.registerFromImagePath(
+          id: 'admin',
+          imagePath: adminFile.path,
+          imageId: 'profile',
+          name: 'Admin',
+        );
       }
 
-      // Verifikasi wajah
-      final isMatch = await _compareFaces(image.path, faceDetector);
-      await faceDetector.close();
-      
-      if (isMatch) {
+      // Verifikasi wajah live dengan data yang terdaftar
+      final matchId = await FaceVerification.instance.verifyFromImagePath(
+        imagePath: image.path,
+        threshold: 0.70,
+        staffId: 'admin', // Hanya cocokkan dengan wajah admin
+      );
+
+      if (matchId == 'admin') {
         if (mounted) {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (_) => const WelcomeScreen()),
@@ -89,37 +101,10 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
         });
       }
     } catch (e) {
-      await faceDetector.close();
       setState(() {
         _isProcessing = false;
         _status = 'Error: $e';
       });
-    }
-  }
-
-  Future<bool> _compareFaces(String liveImagePath, FaceDetector faceDetector) async {
-    try {
-      // 1. Deteksi wajah pada foto live
-      final liveImage = InputImage.fromFilePath(liveImagePath);
-      final liveFaces = await faceDetector.processImage(liveImage);
-      if (liveFaces.isEmpty) return false;
-
-      // 2. Load gambar admin dari assets untuk validasi dasar
-      final byteData = await DefaultAssetBundle.of(context).load('assets/admin.png');
-      final tempDir = await getTemporaryDirectory();
-      final adminFile = File('${tempDir.path}/admin_temp.png');
-      await adminFile.writeAsBytes(byteData.buffer.asUint8List());
-
-      final adminImage = InputImage.fromFilePath(adminFile.path);
-      final adminFaces = await faceDetector.processImage(adminImage);
-      if (adminFaces.isEmpty) return false;
-
-      // Berhubung package pengenalan wajah eksternal sudah dihapus,
-      // validasi memastikan bahwa wajah terdeteksi dengan sukses pada kedua sisi.
-      return true;
-    } catch (e) {
-      debugPrint('Error compare faces: $e');
-      return false;
     }
   }
 
@@ -135,7 +120,6 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Preview Kamera
           if (_controller != null && _controller!.value.isInitialized)
             Center(
               child: AspectRatio(
