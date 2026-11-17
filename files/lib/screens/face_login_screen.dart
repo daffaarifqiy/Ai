@@ -65,7 +65,6 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
     try {
       final image = await _controller!.takePicture();
       
-      // Pastikan admin terdaftar (hanya dilakukan sekali atau jika belum ada)
       final isAdminRegistered = await FaceVerification.instance.isFaceRegistered('admin');
       if (!isAdminRegistered) {
         final byteData = await DefaultAssetBundle.of(context).load('assets/admin.png');
@@ -81,11 +80,10 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
         );
       }
 
-      // Verifikasi wajah live dengan data yang terdaftar
       final matchId = await FaceVerification.instance.verifyFromImagePath(
         imagePath: image.path,
         threshold: 0.70,
-        staffId: 'admin', // Hanya cocokkan dengan wajah admin
+        staffId: 'admin',
       );
 
       if (matchId == 'admin') {
@@ -130,7 +128,6 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
           else
             const Center(child: CircularProgressIndicator()),
 
-          // Overlay Lingkaran
           Center(
             child: Container(
               width: 250,
@@ -142,7 +139,6 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
             ),
           ),
 
-          // Status Text & Tombol
           Positioned(
             bottom: 0,
             left: 0,
@@ -172,7 +168,6 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
             ),
           ),
 
-          // Tombol Kembali ke PIN
           SafeArea(
             child: IconButton(
               icon: const Icon(Icons.arrow_back, color: Colors.white),
