@@ -88,7 +88,7 @@ jobs:
           }
           android {
               namespace = "com.xdfaaa.xdfaaa_ai"
-              compileSdk = 35
+              compileSdk = 36
               ndkVersion = "27.0.12077973"
               compileOptions {
                   sourceCompatibility = JavaVersion.VERSION_17
@@ -98,7 +98,7 @@ jobs:
               defaultConfig {
                   applicationId = "com.xdfaaa.xdfaaa_ai"
                   minSdk = 26
-                  targetSdk = 35
+                  targetSdk = 36
                   versionCode = 7
                   versionName = "1.4.0"
               }
