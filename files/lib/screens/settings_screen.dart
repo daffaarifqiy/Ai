@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/settings_service.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -12,7 +13,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _pinCtrl = TextEditingController();
   final _tokenCtrl = TextEditingController();
   final _repoCtrl = TextEditingController();
-  
   bool _isLoading = true;
 
   @override
@@ -22,7 +22,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _loadCurrentSettings() async {
-    // Ambil data yang sudah tersimpan sebelumnya
     final currentPin = await SettingsService.getPassword();
     final currentToken = await SettingsService.getGithubToken();
     final currentRepo = await SettingsService.getGithubRepo();
@@ -77,17 +76,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Pengaturan'),
-      ),
+      appBar: AppBar(title: const Text('Pengaturan')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                // ==========================================
-                // BAGIAN 1: KEAMANAN (PASSWORD)
-                // ==========================================
                 _buildSectionTitle('Keamanan Aplikasi', Icons.lock_outline),
                 const SizedBox(height: 12),
                 TextField(
@@ -109,20 +103,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     label: const Text('Simpan PIN Baru'),
                   ),
                 ),
-
                 const SizedBox(height: 32),
                 const Divider(color: Colors.white24),
                 const SizedBox(height: 16),
-
-                // ==========================================
-                // BAGIAN 2: GITHUB (BACKUP)
-                // ==========================================
                 _buildSectionTitle('Backup ke GitHub', Icons.cloud_upload_outlined),
                 const SizedBox(height: 8),
                 const Text(
                   'Masukkan Personal Access Token (PAT) dan URL Repo GitHub kamu. '
-                  'Data ini digunakan untuk mencadangkan riwayat chat secara otomatis.',
-                  style: TextStyle(fontSize: 12, color: Colors.white54),
+                  'PENTING: Pastikan Repo bersifat PUBLIK agar bisa diakses.',
+                  style: TextStyle(fontSize: 12, color: Colors.amberAccent),
                 ),
                 const SizedBox(height: 16),
                 TextField(
@@ -156,21 +145,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 32),
                 const Divider(color: Colors.white24),
                 const SizedBox(height: 16),
-
-                // ==========================================
-                // BAGIAN 3: TENTANG APLIKASI
-                // ==========================================
                 _buildSectionTitle('Tentang', Icons.info_outline),
                 const SizedBox(height: 12),
                 const ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: Icon(Icons.smart_toy, color: Colors.deepPurpleAccent),
                   title: Text('xdfaaa ai'),
-                  subtitle: Text('Versi 1.2.0\nModel: Qwen2.5-Coder-1.5B'),
+                  subtitle: Text('Versi 1.5.0\nModel: Qwen2.5-Coder-1.5B Q4_K_M'),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final url = Uri.parse('https://instagram.com/zyenn_faaa');
+                      if (await canLaunchUrl(url)) {
+                        await launchUrl(url);
+                      }
+                    },
+                    icon: const Icon(Icons.camera_alt, color: Colors.pinkAccent),
+                    label: const Text('Instagram: zyenn_faaa', style: TextStyle(color: Colors.pinkAccent)),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.pinkAccent),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -184,11 +186,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const SizedBox(width: 8),
         Text(
           title,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
         ),
       ],
     );
