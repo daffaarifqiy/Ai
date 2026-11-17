@@ -163,13 +163,9 @@ class PermissionService {
 class ModelService {
   static const String modelUrl = 'https://huggingface.co/huihui-ai/Qwen2.5-Coder-1.5B-Instruct-abliterated-GGUF/resolve/main/Qwen2.5-Coder-1.5B-Instruct-abliterated.Q4_K_M.gguf';
   static const String modelFileName = 'qwen2.5-coder-1.5b-abliterated.gguf';
-  
-  // DITINGKATKAN: Model asli berukuran ~1.1 GB. Minimal harus > 1.000.000.000 bytes
   static const int minValidSize = 1000000000; 
 
   static Future<Directory> getModelDir() async {
-    // DIUBAH: Gunakan ApplicationDocumentsDirectory (Internal Storage)
-    // Agar library C++ dijamin bisa membaca file tanpa masalah izin Android.
     final base = await getApplicationDocumentsDirectory();
     final dir = Directory('${base.path}/xdfaaa_ai_models');
     if (!await dir.exists()) await dir.create(recursive: true);
@@ -183,7 +179,6 @@ class ModelService {
     return await f.exists() && await f.length() > minValidSize;
   }
 
-  // TAMBAHAN: Fungsi untuk menghapus model yang korup
   static Future<void> deleteModel() async {
     final f = File(await getModelPath());
     if (await f.exists()) await f.delete();
@@ -219,7 +214,13 @@ class ModelService {
       gpuLayers = gpu.recommendedGpuLayers;
     } catch (_) {}
     
-    await c.loadModel(modelPath: path, threads: 4, contextSize: 4096, gpuLayers: gpuLayers);
+    // PERBAIKAN: Turunkan contextSize menjadi 2048 agar tidak OOM (Out of Memory)
+    await c.loadModel(
+      modelPath: path, 
+      threads: 4, 
+      contextSize: 2048, 
+      gpuLayers: gpuLayers
+    );
     return c;
   }
 }
