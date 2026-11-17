@@ -18,7 +18,8 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.29.3' 
+          # Flutter 3.35.0 menggunakan Dart 3.9.x (memenuhi syarat >=3.8.1)
+          flutter-version: '3.35.0'
           channel: stable
 
       - name: Prepare Project
@@ -98,8 +99,8 @@ jobs:
                   applicationId = "com.xdfaaa.xdfaaa_ai"
                   minSdk = 26
                   targetSdk = 36
-                  versionCode = 9
-                  versionName = "1.5.1"
+                  versionCode = 10
+                  versionName = "1.5.2"
               }
               buildTypes {
                   release {
