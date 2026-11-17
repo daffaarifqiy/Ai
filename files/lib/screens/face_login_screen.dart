@@ -28,9 +28,9 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
   Future<void> _initFaceVerification() async {
     try {
       await FaceVerification.instance.init();
-      _isInitialized = true;
+      if (mounted) setState(() => _isInitialized = true);
     } catch (e) {
-      setState(() => _status = 'Gagal inisialisasi AI Wajah: $e');
+      if (mounted) setState(() => _status = 'Gagal inisialisasi AI Wajah: $e');
     }
   }
 
@@ -38,7 +38,7 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
     try {
       final cameras = await availableCameras();
       if (cameras.isEmpty) {
-        setState(() => _status = 'Kamera tidak ditemukan');
+        if (mounted) setState(() => _status = 'Kamera tidak ditemukan');
         return;
       }
       final frontCamera = cameras.firstWhere(
@@ -50,7 +50,7 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
       await _controller!.initialize();
       if (mounted) setState(() => _status = 'Posisikan wajah Anda di dalam lingkaran');
     } catch (e) {
-      setState(() => _status = 'Gagal memuat kamera: $e');
+      if (mounted) setState(() => _status = 'Gagal memuat kamera: $e');
     }
   }
 
@@ -65,8 +65,10 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
     try {
       final image = await _controller!.takePicture();
       
+      // Pastikan admin terdaftar
       final isAdminRegistered = await FaceVerification.instance.isFaceRegistered('admin');
       if (!isAdminRegistered) {
+        setState(() => _status = 'Mendaftarkan wajah admin...');
         final byteData = await DefaultAssetBundle.of(context).load('assets/admin.png');
         final tempDir = await getTemporaryDirectory();
         final adminFile = File('${tempDir.path}/admin_temp.png');
@@ -80,6 +82,9 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
         );
       }
 
+      setState(() => _status = 'Memverifikasi wajah...');
+      
+      // Verifikasi wajah
       final matchId = await FaceVerification.instance.verifyFromImagePath(
         imagePath: image.path,
         threshold: 0.70,
@@ -93,16 +98,20 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
           );
         }
       } else {
-        setState(() {
-          _isProcessing = false;
-          _status = 'Wajah tidak cocok. Akses ditolak.';
-        });
+        if (mounted) {
+          setState(() {
+            _isProcessing = false;
+            _status = 'Wajah tidak cocok. Akses ditolak.';
+          });
+        }
       }
     } catch (e) {
-      setState(() {
-        _isProcessing = false;
-        _status = 'Error: $e';
-      });
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+          _status = 'Error: $e';
+        });
+      }
     }
   }
 
@@ -128,6 +137,7 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
           else
             const Center(child: CircularProgressIndicator()),
 
+          // Overlay Lingkaran
           Center(
             child: Container(
               width: 250,
@@ -139,6 +149,7 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
             ),
           ),
 
+          // Status Text & Tombol
           Positioned(
             bottom: 0,
             left: 0,
@@ -168,6 +179,7 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
             ),
           ),
 
+          // Tombol Kembali ke PIN
           SafeArea(
             child: IconButton(
               icon: const Icon(Icons.arrow_back, color: Colors.white),
