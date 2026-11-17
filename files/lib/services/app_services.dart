@@ -161,11 +161,17 @@ class PermissionService {
 }
 
 class ModelService {
-  static const String modelUrl = 'https://huggingface.co/huihui-ai/Qwen2.5-Coder-1.5B-Instruct-abliterated-GGUF/resolve/main/Qwen2.5-Coder-1.5B-Instruct-abliterated.Q4_K_M.gguf';
-  static const String modelFileName = 'qwen2.5-coder-1.5b-abliterated.gguf';
+  // ==========================================
+  // PERUBAHAN MODEL DI SINI (Qwen2.5-Coder-1.5B Q4_K_M)
+  // ==========================================
+  static const String modelUrl = 'https://huggingface.co/bartowski/Qwen2.5-Coder-1.5B-Instruct-abliterated-GGUF/resolve/main/Qwen2.5-Coder-1.5B-Instruct-abliterated-Q4_K_M.gguf';
+  static const String modelFileName = 'qwen2.5-coder-1.5b-abliterated-q4_k_m.gguf';
+  
+  // Ukuran Q4_K_M sekitar 1.04 GB, jadi validasi minimal 1.000.000.000 bytes (1 GB)
   static const int minValidSize = 1000000000; 
 
   static Future<Directory> getModelDir() async {
+    // Menggunakan ApplicationDocumentsDirectory (Internal Storage)
     final base = await getApplicationDocumentsDirectory();
     final dir = Directory('${base.path}/xdfaaa_ai_models');
     if (!await dir.exists()) await dir.create(recursive: true);
@@ -214,7 +220,7 @@ class ModelService {
       gpuLayers = gpu.recommendedGpuLayers;
     } catch (_) {}
     
-    // PERBAIKAN: Turunkan contextSize menjadi 2048 agar tidak OOM (Out of Memory)
+    // contextSize 2048 agar aman dari Out of Memory (OOM) di HP
     await c.loadModel(
       modelPath: path, 
       threads: 4, 
