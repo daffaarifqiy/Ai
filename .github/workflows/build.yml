@@ -1,3 +1,4 @@
+
 name: Build xdfaaa ai APK
 
 on:
@@ -8,6 +9,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
@@ -18,33 +20,49 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          # Flutter 3.35.0 menggunakan Dart 3.9.x (memenuhi syarat >=3.8.1)
           flutter-version: '3.35.0'
           channel: stable
 
       - name: Prepare Project
         run: |
           rm -rf ./build_src
-          flutter create --platforms=android --org com.xdfaaa --project-name xdfaaa_ai ./build_src
-          
-          if [ -f "pubspec.yaml" ]; then cp pubspec.yaml ./build_src/
-          elif [ -f "files/pubspec.yaml" ]; then cp files/pubspec.yaml ./build_src/; fi
 
-          if [ -d "lib" ]; then cp -r lib ./build_src/
-          elif [ -d "files/lib" ]; then cp -r files/lib ./build_src/; fi
+          flutter create \
+            --platforms=android \
+            --org com.xdfaaa \
+            --project-name xdfaaa_ai \
+            ./build_src
+
+          if [ -f "pubspec.yaml" ]; then
+            cp pubspec.yaml ./build_src/
+          elif [ -f "files/pubspec.yaml" ]; then
+            cp files/pubspec.yaml ./build_src/
+          fi
+
+          if [ -d "lib" ]; then
+            cp -r lib ./build_src/
+          elif [ -d "files/lib" ]; then
+            cp -r files/lib ./build_src/
+          fi
 
           mkdir -p ./build_src/assets
-          if [ -d "assets" ]; then cp -r assets/* ./build_src/assets/ 2>/dev/null || true
-          elif [ -d "files/assets" ]; then cp -r files/assets/* ./build_src/assets/ 2>/dev/null || true; fi
+
+          if [ -d "assets" ]; then
+            cp -r assets/* ./build_src/assets/ 2>/dev/null || true
+          elif [ -d "files/assets" ]; then
+            cp -r files/assets/* ./build_src/assets/ 2>/dev/null || true
+          fi
 
           cat << 'EOF' > ./build_src/android/settings.gradle
           pluginManagement {
               def flutterSdkPath = {
                   def properties = new Properties()
-                  file("local.properties").withInputStream { properties.load(it) }
-                  def flutterSdkPath = properties.getProperty("flutter.sdk")
-                  assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
-                  return flutterSdkPath
+                  file("local.properties").withInputStream {
+                      properties.load(it)
+                  }
+                  def path = properties.getProperty("flutter.sdk")
+                  assert path != null
+                  return path
               }()
               includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
               repositories {
@@ -53,12 +71,25 @@ jobs:
                   gradlePluginPortal()
               }
           }
+
           plugins {
               id "dev.flutter.flutter-plugin-loader" version "1.0.0"
               id "com.android.application" version "8.13.0" apply false
               id "org.jetbrains.kotlin.android" version "2.2.20" apply false
           }
+
           include ":app"
+          EOF
+
+          # FIX: Gradle 8.13
+          cat << 'EOF' > ./build_src/android/gradle/wrapper/gradle-wrapper.properties
+          distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          distributionUrl=https\://services.gradle.org/distributions/gradle-8.13-bin.zip
+          networkTimeout=10000
+          validateDistributionUrl=true
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
           EOF
 
           cat << 'EOF' > ./build_src/android/build.gradle
@@ -68,13 +99,17 @@ jobs:
                   mavenCentral()
               }
           }
+
           rootProject.buildDir = "../build"
+
           subprojects {
               project.buildDir = "${rootProject.buildDir}/${project.name}"
           }
+
           subprojects {
               project.evaluationDependsOn(":app")
           }
+
           tasks.register("clean", Delete) {
               delete rootProject.buildDir
           }
@@ -86,15 +121,21 @@ jobs:
               id "kotlin-android"
               id "dev.flutter.flutter-gradle-plugin"
           }
+
           android {
               namespace = "com.xdfaaa.xdfaaa_ai"
               compileSdk = 36
               ndkVersion = "27.0.12077973"
+
               compileOptions {
                   sourceCompatibility = JavaVersion.VERSION_17
                   targetCompatibility = JavaVersion.VERSION_17
               }
-              kotlinOptions { jvmTarget = '17' }
+
+              kotlinOptions {
+                  jvmTarget = '17'
+              }
+
               defaultConfig {
                   applicationId = "com.xdfaaa.xdfaaa_ai"
                   minSdk = 26
@@ -102,6 +143,7 @@ jobs:
                   versionCode = 10
                   versionName = "1.5.2"
               }
+
               buildTypes {
                   release {
                       signingConfig = signingConfigs.debug
@@ -110,11 +152,15 @@ jobs:
                   }
               }
           }
-          flutter { source = '../..' }
+
+          flutter {
+              source = '../..'
+          }
           EOF
 
           cat << 'EOF' > ./build_src/android/app/src/main/AndroidManifest.xml
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
               <uses-permission android:name="android.permission.INTERNET" />
               <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
               <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
@@ -123,6 +169,7 @@ jobs:
               <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
               <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
               <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+
               <application
                   android:label="xdfaaa ai"
                   android:name="${applicationName}"
@@ -130,6 +177,7 @@ jobs:
                   android:largeHeap="true"
                   android:usesCleartextTraffic="true"
                   android:hardwareAccelerated="true">
+
                   <activity
                       android:name=".MainActivity"
                       android:exported="true"
@@ -138,13 +186,21 @@ jobs:
                       android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
                       android:hardwareAccelerated="true"
                       android:windowSoftInputMode="adjustResize">
-                      <meta-data android:name="io.flutter.embedding.android.NormalTheme" android:resource="@style/NormalTheme" />
+
+                      <meta-data
+                          android:name="io.flutter.embedding.android.NormalTheme"
+                          android:resource="@style/NormalTheme" />
+
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN"/>
                           <category android:name="android.intent.category.LAUNCHER"/>
                       </intent-filter>
                   </activity>
-                  <meta-data android:name="flutterEmbedding" android:value="2" />
+
+                  <meta-data
+                      android:name="flutterEmbedding"
+                      android:value="2" />
+
               </application>
           </manifest>
           EOF
