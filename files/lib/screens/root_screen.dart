@@ -20,6 +20,7 @@ class _RootScreenState extends State<RootScreen> {
       body: IndexedStack(
         index: _index,
         children: [
+          // AI Controller diteruskan ke ChatScreen
           ChatScreen(controller: widget.controller),
           const ProjectScreen(),
         ],
