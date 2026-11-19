@@ -25,6 +25,7 @@ class _ChatScreenState extends State<ChatScreen> {
   
   StreamSubscription<String>? _sub;
   bool _generating = false;
+  bool _isAiReady = false; // Indikator AI siap
   
   AIMode _currentMode = AIMode.fast;
   String? _activeProject;
@@ -32,6 +33,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    _isAiReady = true; // Anggap siap karena controller sudah di-pass dari WelcomeScreen
     _loadInitialSession();
   }
 
@@ -59,13 +61,13 @@ class _ChatScreenState extends State<ChatScreen> {
       _messages = ChatStorage.getMessages(_currentSession!.id);
       await ChatStorage.saveLastSessionId(_currentSession!.id);
     } else {
-      await _createNewChat();
+      await _createNewChat(); // SEKARANG AMAN KARENA MENGGUNAKAN Future
     }
     setState(() {});
     _scrollToBottom();
   }
 
-  void _createNewChat({String? project}) async {
+  Future<void> _createNewChat({String? project}) async {
     final newSess = await ChatStorage.createSession(projectName: project);
     setState(() {
       _sessions.insert(0, newSess);
@@ -83,7 +85,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
   }
 
-  void _openSession(ChatSession session) async {
+  Future<void> _openSession(ChatSession session) async {
     setState(() {
       _currentSession = session;
       _messages = ChatStorage.getMessages(session.id);
@@ -100,9 +102,9 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
   }
 
-  void _deleteSession(ChatSession session) async {
+  Future<void> _deleteSession(ChatSession session) async {
     await ChatStorage.deleteSession(session.id);
-    _loadInitialSession();
+    await _loadInitialSession();
   }
 
   void _scrollToBottom() {
@@ -169,31 +171,42 @@ class _ChatScreenState extends State<ChatScreen> {
     ];
 
     final buffer = StringBuffer();
-    _sub = widget.controller.generateChat(
-      messages: chatHistory,
-      template: 'chatml',
-      maxTokens: 2048,
-      temperature: 0.7,
-    ).listen(
-      (token) {
-        buffer.write(token);
-        final idx = _messages.indexWhere((m) => m.id == botMsg.id);
-        if (idx == -1) return;
-        setState(() {
-          _messages[idx] = ChatMessage(id: botMsg.id, role: 'assistant', content: buffer.toString(), timestamp: botMsg.timestamp);
-        });
-        _scrollToBottom();
-      },
-      onDone: () async {
-        await ChatStorage.saveMessage(_currentSession!.id, ChatMessage(id: botMsg.id, role: 'assistant', content: buffer.toString(), timestamp: botMsg.timestamp));
-        setState(() => _generating = false);
-        _sub = null;
-      },
-      onError: (e) {
-        setState(() => _generating = false);
-        _sub = null;
-      },
-    );
+    
+    try {
+      _sub = widget.controller.generateChat(
+        messages: chatHistory,
+        template: 'chatml',
+        maxTokens: 2048,
+        temperature: 0.7,
+      ).listen(
+        (token) {
+          buffer.write(token);
+          final idx = _messages.indexWhere((m) => m.id == botMsg.id);
+          if (idx == -1) return;
+          setState(() {
+            _messages[idx] = ChatMessage(id: botMsg.id, role: 'assistant', content: buffer.toString(), timestamp: botMsg.timestamp);
+          });
+          _scrollToBottom();
+        },
+        onDone: () async {
+          await ChatStorage.saveMessage(_currentSession!.id, ChatMessage(id: botMsg.id, role: 'assistant', content: buffer.toString(), timestamp: botMsg.timestamp));
+          setState(() => _generating = false);
+          _sub = null;
+        },
+        onError: (e) {
+          setState(() {
+            _generating = false;
+            _messages.add(ChatMessage(role: 'assistant', content: 'Terjadi kesalahan pada AI: $e'));
+          });
+          _sub = null;
+        },
+      );
+    } catch (e) {
+      setState(() {
+        _generating = false;
+        _messages.add(ChatMessage(role: 'assistant', content: 'Gagal memproses: $e'));
+      });
+    }
   }
 
   void _selectProjectMode() async {
@@ -252,7 +265,29 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('xdfaaa ai'),
+        title: Row(
+          children: [
+            const Text('xdfaaa ai'),
+            const SizedBox(width: 8),
+            // Indikator AI Aktif
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: _isAiReady ? Colors.green.withOpacity(0.2) : Colors.red.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: _isAiReady ? Colors.greenAccent : Colors.redAccent),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.circle, size: 8, color: _isAiReady ? Colors.greenAccent : Colors.redAccent),
+                  const SizedBox(width: 4),
+                  Text(_isAiReady ? 'Aktif' : 'Off', style: TextStyle(fontSize: 10, color: _isAiReady ? Colors.greenAccent : Colors.redAccent)),
+                ],
+              ),
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
@@ -354,7 +389,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   const SizedBox(width: 8),
                   IconButton.filled(
-                    onPressed: _generating ? null : _sendMessage,
+                    onPressed: _generating || !_isAiReady ? null : _sendMessage,
                     icon: const Icon(Icons.send),
                   ),
                 ],
