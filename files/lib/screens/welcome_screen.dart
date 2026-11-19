@@ -40,11 +40,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         await ModelService.deleteModel();
       }
 
-      setState(() => _status = 'Memeriksa model...');
+      setState(() => _status = 'Memeriksa ketersediaan model...');
       bool modelReady = await ModelService.isModelDownloaded();
 
       if (!modelReady) {
-        setState(() => _status = 'Mengunduh model (1.1 GB)...');
+        setState(() => _status = 'Mengunduh model AI...');
         await ModelService.downloadModel(onProgress: (recv, total) {
           if (mounted && total > 0) {
             setState(() {
@@ -54,8 +54,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         });
       }
 
-      setState(() => _status = 'Memuat mesin AI...');
+      setState(() => _status = 'Mengaktifkan mesin AI...');
       
+      // Proses ini memuat model ke memori (LlamaController)
       final controller = await ModelService.loadModel();
       
       if (mounted) {
@@ -68,7 +69,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         setState(() {
           _isLoading = false;
           _isError = true;
-          _status = 'Gagal memuat AI:\n$e\n\nPastikan HP memiliki RAM cukup dan file model tidak korup.';
+          _status = 'Gagal mengaktifkan AI:\n$e\n\nPastikan RAM cukup dan coba lagi.';
         });
       }
     }
